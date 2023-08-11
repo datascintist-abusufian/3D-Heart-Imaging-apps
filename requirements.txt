@@ -11,6 +11,7 @@ torchvision>=0.8.1
 tqdm>=4.64.0
 streamlit>=1.22.0
 wget>=3.2
+psutil
 
 # Plotting
 pandas>=1.1.4
@@ -18,4 +19,3 @@ seaborn>=0.11.0
 
 # Deploy tools
 setuptools>=65.5.1
-
