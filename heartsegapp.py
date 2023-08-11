@@ -9,14 +9,20 @@ import wget
 import time
 
 
-@st.cache(allow_output_mutation=True, suppress_st_warning=True)
-def loadModel():
-    start_dl = time.time()
-    model_file = wget.download('https://archive.org/download/yoloTrained/yoloTrained.pt', out="models/")
-    finished_dl = time.time()
-    st.write(f"Model Downloaded in {finished_dl-start_dl} seconds")
-    return model_file
+@st.cache(allow_output_mutation=True)
+def load_model():
+    model_path = "models/yoloTrained.pt"
+    if not os.path.exists(model_path):
+        start_dl = time.time()
+        wget.download('https://archive.org/download/yoloTrained/yoloTrained.pt', out="models/")
+        finished_dl = time.time()
+        print(f"Model Downloaded, ETA:{finished_dl-start_dl}")
+    model = torch.load(model_path)
+    return model
 
+model = load_model()
+
+def imageInput(src):
 
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_yolov5_model():
