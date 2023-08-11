@@ -18,8 +18,5 @@ wget>=3.2
 pandas>=1.1.4
 seaborn>=0.11.0
 
-# YOLOv5 GitHub installation (uncomment if required)
-#git+https://github.com/ultralytics/yolov5
-
 # Deploy tools
 setuptools>=65.5.1
