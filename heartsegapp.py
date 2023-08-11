@@ -1,6 +1,5 @@
 import streamlit as st
 import torch
-import detect
 from PIL import Image
 import glob
 from datetime import datetime
@@ -8,26 +7,18 @@ import os
 import wget
 import time
 
-
-@st.cache(allow_output_mutation=True)
+@st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_model():
     model_path = "models/yoloTrained.pt"
     if not os.path.exists(model_path):
         start_dl = time.time()
         wget.download('https://archive.org/download/yoloTrained/yoloTrained.pt', out="models/")
         finished_dl = time.time()
-        print(f"Model Downloaded, ETA:{finished_dl-start_dl}")
+        st.write(f"Model Downloaded in {finished_dl-start_dl} seconds")
     model = torch.load(model_path)
     return model
 
 model = load_model()
-
-def imageInput(src):
-
-@st.cache(allow_output_mutation=True, suppress_st_warning=True)
-def load_yolov5_model():
-    return torch.hub.load('ultralytics/yolov5', 'custom', path='heart_1st/weights/best.pt', force_reload=True)
-
 
 def imageInput(src):
     if src == 'Upload your own Image':
@@ -45,7 +36,6 @@ def imageInput(src):
 
             try:
                 # Call Model prediction
-                model = load_yolov5_model()
                 pred = model(imgpath)
                 pred.render()  # render bbox in image
                 for im in pred.ims:
@@ -71,7 +61,6 @@ def imageInput(src):
         with col2:
             if image_file is not None and submit:
                 try:
-                    model = load_yolov5_model()
                     pred = model(image_file)
                     pred.render()  # render bbox in image
                     for im in pred.ims:
@@ -82,7 +71,6 @@ def imageInput(src):
                 except Exception as e:
                     st.write(f"Error during prediction: {e}")
 
-
 def main():
     st.image("logo.jpg", width=500)
     st.title("3D Heart MRI Image Segmentation")
@@ -91,7 +79,5 @@ def main():
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
     imageInput(src)
 
-
 if __name__ == '__main__':
-    loadModel()  # If you don't use this model anywhere, consider removing this line.
     main()
