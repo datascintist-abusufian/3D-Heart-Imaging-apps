@@ -13,7 +13,6 @@ def load_model():
     model_path = "models/yoloTrained.pt"
     
     if not os.path.exists(model_path):
-        if not os.path.exists(model_path):
     os.system("wget --no-check-certificate -O models/yoloTrained.pt https://archive.org/download/yoloTrained/yoloTrained.pt")
 
     
@@ -27,10 +26,13 @@ def load_model():
         with open(model_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-                
-        finished_dl = time.time()
-        st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
-    
+                start_dl = time.time()  # Start the timer
+
+# ... [The download process happens here] ...
+
+finished_dl = time.time()  # End the timer
+st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
+
     model = torch.load(model_path)
     return model
 
