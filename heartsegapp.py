@@ -13,26 +13,22 @@ def load_model():
     model_path = "models/yoloTrained.pt"
     
     if not os.path.exists(model_path):
-    os.system("wget --no-check-certificate -O models/yoloTrained.pt https://archive.org/download/yoloTrained/yoloTrained.pt")
-
-    
         # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         
         url = 'https://archive.org/download/yoloTrained/yoloTrained.pt'
+        
+        start_dl = time.time()  # Start the timer
         
         # Download the model
         response = requests.get(url, stream=True, verify=False)  # Note: verify=False bypasses SSL certificate verification
         with open(model_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-                start_dl = time.time()  # Start the timer
-
-# ... [The download process happens here] ...
-
-finished_dl = time.time()  # End the timer
-st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
-
+                
+        finished_dl = time.time()  # End the timer
+        st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
+    
     model = torch.load(model_path)
     return model
 
