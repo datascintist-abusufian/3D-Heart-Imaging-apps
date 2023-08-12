@@ -4,7 +4,7 @@ from PIL import Image
 import glob
 from datetime import datetime
 import os
-import wget
+import requests
 import time
 
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
@@ -12,9 +12,13 @@ def load_model():
     model_path = "models/yoloTrained.pt"
     if not os.path.exists(model_path):
         start_dl = time.time()
-        wget.download('https://archive.org/download/yoloTrained/yoloTrained.pt', out="models/")
+        url = 'https://archive.org/download/yoloTrained/yoloTrained.pt'
+        response = requests.get(url, stream=True)
+        with open(model_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
         finished_dl = time.time()
-        st.write(f"Model Downloaded in {finished_dl-start_dl} seconds")
+        st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
     model = torch.load(model_path)
     return model
 
