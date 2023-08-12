@@ -13,8 +13,10 @@ def load_model():
     model_path = "models/yoloTrained.pt"
     
     if not os.path.exists(model_path):
-        start_dl = time.time()
-        
+        if not os.path.exists(model_path):
+    os.system("wget --no-check-certificate -O models/yoloTrained.pt https://archive.org/download/yoloTrained/yoloTrained.pt")
+
+    
         # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         
