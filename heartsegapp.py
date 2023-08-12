@@ -1,3 +1,4 @@
+
 import streamlit as st
 import torch
 from PIL import Image
@@ -95,3 +96,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+my_dict = {"key": "value"}
+print(my_dict["key"])
