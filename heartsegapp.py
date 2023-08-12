@@ -8,6 +8,7 @@ import os
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import time
+from torchvision.transforms import transforms
 
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_model():
@@ -31,28 +32,39 @@ def load_model():
         st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
     
     model = torch.load(model_path)
+    st.write(f"Model type: {type(model)}")  # Print model type to Streamlit
     return model
 
 model = load_model()
 
+def process_image(img_path):
+    # This is a simple function to process an image to tensor.
+    # You might need to adjust it based on your model requirements.
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+    ])
+    
+    image = Image.open(img_path)
+    image = transform(image).unsqueeze(0)
+    return image
+
 def imageInput(src):
     if src == 'Upload your own Image':
-        image_file = st.file_uploader("Upload a 3D Heart MRI Image", type=['png', 'jpeg', 'jpg'])
-        col1, col2 = st.columns(2)
-        if image_file is not None:
-            img = Image.open(image_file)
-            with col1:
-                st.image(img, caption='Uploaded 3D Heart MRI Image', use_column_width=True)
-            ts = datetime.timestamp(datetime.now())
-            imgpath = os.path.join('data/uploads', str(ts) + image_file.name)
-            outputpath = os.path.join('data/outputs', os.path.basename(imgpath))
-            with open(imgpath, mode="wb") as f:
-                f.write(image_file.getbuffer())
+        # ... (rest of your code)
 
             try:
-                # Call Model prediction
-                pred = model(imgpath)
-                pred.render()  # render bbox in image
+                # Process the image to tensor
+                img_tensor = process_image(imgpath)
+
+                # Make prediction
+                with torch.no_grad():
+                    pred = model(img_tensor)
+
+                # Since you mentioned 'render' and 'ims', I'm assuming 
+                # you're working with a modified YOLO or similar object detection model
+                pred.render()
                 for im in pred.ims:
                     im_base64 = Image.fromarray(im)
                     im_base64.save(outputpath)
@@ -65,19 +77,17 @@ def imageInput(src):
                 st.write(f"Error during prediction: {e}")
 
     elif src == 'From sample Images':
-        imgpath = glob.glob('data/images/test/*')
-        imgsel = st.slider('Select random images from test set.', min_value=1, max_value=len(imgpath), step=1)
-        image_file = imgpath[imgsel - 1]
-        submit = st.button("Predict the Heart Segmentation")
-        col1, col2 = st.columns(2)
-        with col1:
-            img = Image.open(image_file)
-            st.image(img, caption='Selected Image', use_column_width='always')
-        with col2:
-            if image_file is not None and submit:
+        # ... (rest of your code)
+
                 try:
-                    pred = model(image_file)
-                    pred.render()  # render bbox in image
+                    # Process the image to tensor
+                    img_tensor = process_image(image_file)
+
+                    # Make prediction
+                    with torch.no_grad():
+                        pred = model(img_tensor)
+
+                    pred.render()
                     for im in pred.ims:
                         im_base64 = Image.fromarray(im)
                         im_base64.save(os.path.join('data/outputs', os.path.basename(image_file)))
