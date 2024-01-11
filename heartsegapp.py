@@ -11,7 +11,7 @@ from torchvision.transforms import transforms
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_model():
     model_path = "models/yoloTrained.pt"
-    
+
     # Check if model exists
     if not os.path.exists(model_path):
         # Disable SSL warnings
@@ -79,6 +79,7 @@ def imageInput(src):
                     # Add your prediction handling code here
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
+                
  elif src == 'From sample Images':
         # List of URLs to your GitHub-hosted images (raw version)
         base_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/"
