@@ -109,6 +109,7 @@ def imageInput(src):
 def main():
     st.image("WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
     st.title("3D Heart MRI Image Segmentation")
+    st.subheader("made by md abu sufian")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
