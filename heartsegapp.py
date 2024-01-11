@@ -82,7 +82,7 @@ def imageInput(src):
 
  elif src == 'From sample Images':
         # Sample images handling
-        sample_image_files = glob.glob("path/to/sample/images/*.jpg")  # Update the path and file type if needed
+        sample_image_files = glob.glob("data/images/test")  # Update the path and file type if needed
         selected_image = st.selectbox("Select an image:", sample_image_files)
         if selected_image:
             try:
