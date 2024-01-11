@@ -80,7 +80,7 @@ def imageInput(src):
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
                 
- elif src == 'From sample Images':
+
         # List of URLs to your GitHub-hosted images (raw version)
         base_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/"
         github_image_urls = [base_url + f"{i}.jpg" for i in range(1, 51)]  # For images 1.jpg to 50.jpg
