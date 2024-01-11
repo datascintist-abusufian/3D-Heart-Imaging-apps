@@ -79,7 +79,6 @@ def imageInput(src):
                     # Add your prediction handling code here
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
-
  elif src == 'From sample Images':
         # List of URLs to your GitHub-hosted images (raw version)
         base_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/"
