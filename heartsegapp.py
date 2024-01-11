@@ -1,19 +1,18 @@
-
 import streamlit as st
 import torch
 from PIL import Image
-import glob
-from datetime import datetime
 import os
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import time
 from torchvision.transforms import transforms
 
+# Cache the model loading
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def load_model():
     model_path = "models/yoloTrained.pt"
     
+    # Check if model exists
     if not os.path.exists(model_path):
         # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -23,88 +22,99 @@ def load_model():
         start_dl = time.time()  # Start the timer
         
         # Download the model
-        response = requests.get(url, stream=True, verify=False)  # Note: verify=False bypasses SSL certificate verification
-        with open(model_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        try:
+            response = requests.get(url, stream=True, verify=False)  # Note: verify=False bypasses SSL certificate verification
+            if response.status_code == 200:
+                with open(model_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            else:
+                st.error("Failed to download the model")
+                return None
                 
+        except Exception as e:
+            st.error(f"Error during model download: {e}")
+            return None
+
         finished_dl = time.time()  # End the timer
         st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
     
-    model = torch.load(model_path)
+    try:
+        model = torch.load(model_path)
+        model.eval()  # Set the model to evaluation mode
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None
+    
     st.write(f"Model type: {type(model)}")  # Print model type to Streamlit
     return model
 
-model = load_model()
-
+# Process the image to a tensor
 def process_image(img_path):
-    # This is a simple function to process an image to tensor.
-    # You might need to adjust it based on your model requirements.
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
     ])
     
-    image = Image.open(img_path)
-    image = transform(image).unsqueeze(0)
-    return image
+    try:
+        image = Image.open(img_path)
+        image = transform(image).unsqueeze(0)
+        return image
+    except Exception as e:
+        st.error(f"Error processing image: {e}")
+        return None
 
+# Function to handle image input
 def imageInput(src):
     if src == 'Upload your own Image':
-        # ... (rest of your code)
-
+        uploaded_file = st.file_uploader("Choose an image...", type="jpg")
+        if uploaded_file is not None:
+            with open(os.path.join("tempDir",uploaded_file.name),"wb") as f: 
+                f.write(uploaded_file.getbuffer())         
             try:
-                # Process the image to tensor
-                img_tensor = process_image(imgpath)
-
-                # Make prediction
-                with torch.no_grad():
+                img_tensor = process_image(os.path.join("tempDir",uploaded_file.name))
+                if img_tensor is not None:
                     pred = model(img_tensor)
-
-                # Since you mentioned 'render' and 'ims', I'm assuming 
-                # you're working with a modified YOLO or similar object detection model
-                pred.render()
-                for im in pred.ims:
-                    im_base64 = Image.fromarray(im)
-                    im_base64.save(outputpath)
-
-                # Display prediction
-                img_ = Image.open(outputpath)
-                with col2:
-                    st.image(img_, caption='Predicted Heart Segmentation', use_column_width=True)
+                    # Add your prediction handling code here
             except Exception as e:
-                st.write(f"Error during prediction: {e}")
+                st.error(f"Error during prediction: {e}")
 
-    elif src == 'From sample Images':
-        # ... (rest of your code)
-
-                try:
-                    # Process the image to tensor
-                    img_tensor = process_image(image_file)
-
-                    # Make prediction
+ elif src == 'From sample Images':
+        # Sample images handling
+        sample_image_files = glob.glob("path/to/sample/images/*.jpg")  # Update the path and file type if needed
+        selected_image = st.selectbox("Select an image:", sample_image_files)
+        if selected_image:
+            try:
+                img_tensor = process_image(selected_image)
+                if img_tensor is not None:
                     with torch.no_grad():
                         pred = model(img_tensor)
 
+                    # Assuming your model has a render function
                     pred.render()
                     for im in pred.ims:
                         im_base64 = Image.fromarray(im)
-                        im_base64.save(os.path.join('data/outputs', os.path.basename(image_file)))
-                    img_ = Image.open(os.path.join('data/outputs', os.path.basename(image_file)))
+                        output_path = os.path.join('data/outputs', os.path.basename(selected_image))
+                        im_base64.save(output_path)
+                    img_ = Image.open(output_path)
                     st.image(img_, caption='Predicted Heart Segmentation')
-                except Exception as e:
-                    st.write(f"Error during prediction: {e}")
+            except Exception as e:
+                st.error(f"Error during prediction: {e}")
 
+
+# Main function
 def main():
     st.image("logo.jpg", width=500)
     st.title("3D Heart MRI Image Segmentation")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
-    imageInput(src)
+
+    global model
+    model = load_model()
+    if model is not None:
+        imageInput(src)
 
 if __name__ == '__main__':
     main()
-my_dict = {"key": "value"}
-print(my_dict["key"])
