@@ -107,7 +107,7 @@ def imageInput(src):
 
 # Main function
 def main():
-    st.image("logo.jpg", width=500)
+    st.image("WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
     st.title("3D Heart MRI Image Segmentation")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
