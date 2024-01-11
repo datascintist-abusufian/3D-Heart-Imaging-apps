@@ -81,12 +81,16 @@ def imageInput(src):
                 st.error(f"Error during prediction: {e}")
 
  elif src == 'From sample Images':
-        # Sample images handling
-        sample_image_files = glob.glob("data/images/test")  # Update the path and file type if needed
-        selected_image = st.selectbox("Select an image:", sample_image_files)
-        if selected_image:
+        # List of URLs to your GitHub-hosted images (raw version)
+        base_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/"
+        github_image_urls = [base_url + f"{i}.jpg" for i in range(1, 51)]  # For images 1.jpg to 50.jpg
+
+        selected_url = st.selectbox("Select an image:", github_image_urls)
+        if selected_url:
             try:
-                img_tensor = process_image(selected_image)
+                response = requests.get(selected_url)
+                image = Image.open(BytesIO(response.content))
+                img_tensor = process_image(image)
                 if img_tensor is not None:
                     with torch.no_grad():
                         pred = model(img_tensor)
@@ -95,10 +99,8 @@ def imageInput(src):
                     pred.render()
                     for im in pred.ims:
                         im_base64 = Image.fromarray(im)
-                        output_path = os.path.join('data/outputs', os.path.basename(selected_image))
-                        im_base64.save(output_path)
-                    img_ = Image.open(output_path)
-                    st.image(img_, caption='Predicted Heart Segmentation')
+                        # Handling for display in Streamlit
+                        st.image(im_base64, caption='Predicted Heart Segmentation')
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
 
