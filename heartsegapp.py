@@ -6,6 +6,7 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
+from ultralytics import YOLO
 
 @st.cache_resource
 def download_model():
@@ -25,7 +26,7 @@ def download_model():
             else:
                 st.error("Failed to download the model")
                 return None
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             st.error(f"Error during model download: {e}")
             return None
     return model_path
@@ -38,7 +39,7 @@ def load_model():
     
     try:
         st.write("Loading model from path...")
-        model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
+        model = YOLO(model_path)
         model.eval()
         st.write("Model loaded successfully.")
     except Exception as e:
@@ -73,11 +74,11 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     with torch.no_grad():
-                        pred = model(img_tensor)
-                        pred.render()
-                        for im in pred.ims:
-                            im_base64 = Image.fromarray(im)
-                            st.image(im_base64, caption='Predicted Heart Segmentation')
+                        results = model(img_tensor)
+                        results.render()
+                        for img in results.ims:
+                            img_pil = Image.fromarray(img)
+                            st.image(img_pil, caption='Predicted Heart Segmentation')
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
 
@@ -93,11 +94,11 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     with torch.no_grad():
-                        pred = model(img_tensor)
-                        pred.render()
-                        for im in pred.ims:
-                            im_base64 = Image.fromarray(im)
-                            st.image(im_base64, caption='Predicted Heart Segmentation')
+                        results = model(img_tensor)
+                        results.render()
+                        for img in results.ims:
+                            img_pil = Image.fromarray(img)
+                            st.image(img_pil, caption='Predicted Heart Segmentation')
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
