@@ -19,4 +19,3 @@ seaborn>=0.11.0
 
 # Deploy tools
 setuptools>=65.5.1
-yolov5
