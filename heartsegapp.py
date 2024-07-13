@@ -6,6 +6,7 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import time
 from torchvision.transforms import transforms
+from io import BytesIO
 
 # Cache the model loading
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
@@ -50,7 +51,7 @@ def load_model():
     return model
 
 # Process the image to a tensor
-def process_image(img_path):
+def process_image(image):
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -58,7 +59,6 @@ def process_image(img_path):
     ])
     
     try:
-        image = Image.open(img_path)
         image = transform(image).unsqueeze(0)
         return image
     except Exception as e:
@@ -70,17 +70,22 @@ def imageInput(src):
     if src == 'Upload your own Image':
         uploaded_file = st.file_uploader("Choose an image...", type="jpg")
         if uploaded_file is not None:
-            with open(os.path.join("tempDir",uploaded_file.name),"wb") as f: 
-                f.write(uploaded_file.getbuffer())         
-            try:
-                img_tensor = process_image(os.path.join("tempDir",uploaded_file.name))
-                if img_tensor is not None:
-                    pred = model(img_tensor)
-                    # Add your prediction handling code here
-            except Exception as e:
-                st.error(f"Error during prediction: {e}")
-                
+            img = Image.open(uploaded_file)
+            img_tensor = process_image(img)
+            if img_tensor is not None:
+                try:
+                    with torch.no_grad():
+                        pred = model(img_tensor)
+                        # Assuming your model has a render function
+                        pred.render()
+                        for im in pred.ims:
+                            im_base64 = Image.fromarray(im)
+                            # Handling for display in Streamlit
+                            st.image(im_base64, caption='Predicted Heart Segmentation')
+                except Exception as e:
+                    st.error(f"Error during prediction: {e}")
 
+    elif src == 'From sample Images':
         # List of URLs to your GitHub-hosted images (raw version)
         base_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/"
         github_image_urls = [base_url + f"{i}.jpg" for i in range(1, 51)]  # For images 1.jpg to 50.jpg
@@ -94,22 +99,20 @@ def imageInput(src):
                 if img_tensor is not None:
                     with torch.no_grad():
                         pred = model(img_tensor)
-
-                    # Assuming your model has a render function
-                    pred.render()
-                    for im in pred.ims:
-                        im_base64 = Image.fromarray(im)
-                        # Handling for display in Streamlit
-                        st.image(im_base64, caption='Predicted Heart Segmentation')
+                        # Assuming your model has a render function
+                        pred.render()
+                        for im in pred.ims:
+                            im_base64 = Image.fromarray(im)
+                            # Handling for display in Streamlit
+                            st.image(im_base64, caption='Predicted Heart Segmentation')
             except Exception as e:
                 st.error(f"Error during prediction: {e}")
-
 
 # Main function
 def main():
     st.image("WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
     st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by md abu sufian")
+    st.subheader("AI driven apps made by Md Abu Sufian")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
