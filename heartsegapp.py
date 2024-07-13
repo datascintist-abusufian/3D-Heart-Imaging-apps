@@ -10,14 +10,14 @@ from io import BytesIO
 # Cache the model loading
 @st.cache_resource
 def load_model():
-    model_path = "models/yoloTrained.pt"
+    model_path = "models/yolov5s.pt"
 
     # Check if model exists
     if not os.path.exists(model_path):
         # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         
-        url = 'https://archive.org/download/yoloTrained/yoloTrained.pt'
+        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
         
         # Download the model
         try:
@@ -29,7 +29,7 @@ def load_model():
             else:
                 st.error("Failed to download the model")
                 return None
-                
+                 
         except Exception as e:
             st.error(f"Error during model download: {e}")
             return None
@@ -58,7 +58,7 @@ def process_image(image):
         return None
 
 # Function to handle image input
-def imageInput(src, model):
+def image_input(src, model):
     if src == 'Upload your own Image':
         uploaded_file = st.file_uploader("Choose an image...", type="jpg")
         if uploaded_file is not None:
@@ -102,7 +102,7 @@ def main():
 
     model = load_model()
     if model is not None:
-        imageInput(src, model)
+        image_input(src, model)
 
 if __name__ == '__main__':
     main()
