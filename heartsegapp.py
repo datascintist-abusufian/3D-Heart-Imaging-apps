@@ -9,7 +9,7 @@ from torchvision.transforms import transforms
 from io import BytesIO
 
 # Cache the model loading
-@st.cache(allow_output_mutation=True, suppress_st_warning=True)
+@st.cache_resource
 def load_model():
     model_path = "models/yoloTrained.pt"
 
@@ -66,7 +66,7 @@ def process_image(image):
         return None
 
 # Function to handle image input
-def imageInput(src):
+def imageInput(src, model):
     if src == 'Upload your own Image':
         uploaded_file = st.file_uploader("Choose an image...", type="jpg")
         if uploaded_file is not None:
@@ -117,10 +117,9 @@ def main():
     st.sidebar.title('⚙️Options')
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-    global model
     model = load_model()
     if model is not None:
-        imageInput(src)
+        imageInput(src, model)
 
 if __name__ == '__main__':
     main()
