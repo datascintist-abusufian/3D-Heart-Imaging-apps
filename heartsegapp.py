@@ -6,6 +6,7 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
+from ultralytics import YOLO
 
 @st.cache_resource
 def load_model():
@@ -14,7 +15,7 @@ def load_model():
 
     if not os.path.exists(model_path):
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-        url = 'https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/models/yolov5s.pt?raw=true'
+        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
         
         try:
             st.write("Downloading model from URL...")
@@ -33,8 +34,7 @@ def load_model():
     
     try:
         st.write("Loading model from path...")
-        model = torch.load(model_path, map_location=torch.device('cpu'))
-        model.eval()
+        model = YOLO(model_path)
         st.write("Model loaded successfully.")
     except Exception as e:
         st.error(f"Error loading model: {e}")
