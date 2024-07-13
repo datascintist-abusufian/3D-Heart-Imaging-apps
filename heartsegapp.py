@@ -10,7 +10,7 @@ from io import BytesIO
 # Cache the model loading
 @st.cache_resource
 def load_model():
-    model_path = "models/yolov5s.pt"
+    model_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/models/yolov5s.pt"
 
     # Check if model exists
     if not os.path.exists(model_path):
@@ -93,7 +93,7 @@ def image_input(src, model):
 
 # Main function
 def main():
-    st.image("WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
+    st.image("/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
     st.title("3D Heart MRI Image Segmentation")
     st.subheader("AI driven apps made by Md Abu Sufian")
     st.header("👈🏽 Select the Image Source options")
