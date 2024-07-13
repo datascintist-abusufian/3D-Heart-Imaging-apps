@@ -6,19 +6,16 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
-from ultralytics import YOLO
 
 @st.cache_resource
-def load_model():
-    st.write("Loading model...")
+def download_model():
+    st.write("Downloading model...")
     model_path = "models/yolov5s.pt"
-
     if not os.path.exists(model_path):
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
         
         try:
-            st.write("Downloading model from URL...")
             response = requests.get(url, stream=True, verify=False)
             if response.status_code == 200:
                 with open(model_path, 'wb') as f:
@@ -31,10 +28,18 @@ def load_model():
         except Exception as e:
             st.error(f"Error during model download: {e}")
             return None
+    return model_path
+
+@st.cache_resource
+def load_model():
+    model_path = download_model()
+    if model_path is None:
+        return None
     
     try:
         st.write("Loading model from path...")
-        model = YOLO(model_path)
+        model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
+        model.eval()
         st.write("Model loaded successfully.")
     except Exception as e:
         st.error(f"Error loading model: {e}")
@@ -62,7 +67,7 @@ def image_input(src, model):
         uploaded_file = st.sidebar.file_uploader("Choose an image...", type="jpg")
         if uploaded_file is not None:
             img = Image.open(uploaded_file)
-            st.image(img, caption='Uploaded Image', use_column_width=True)  # Display the uploaded image
+            st.image(img, caption='Uploaded Image', use_column_width=True)
             img_tensor = process_image(img)
             if img_tensor is not None:
                 try:
@@ -82,7 +87,7 @@ def image_input(src, model):
             st.write("Downloading sample image from URL...")
             response = requests.get(image_url)
             image = Image.open(BytesIO(response.content))
-            st.image(image, caption='Sample Image', use_column_width=True)  # Display the sample image
+            st.image(image, caption='Sample Image', use_column_width=True)
             img_tensor = process_image(image)
             if img_tensor is not None:
                 try:
