@@ -93,7 +93,12 @@ def image_input(src, model):
 
 # Main function
 def main():
-    st.image("/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/WholeHeartSegment_ErrorMap_WhiteBg.gif", width=500)
+    gif_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/WholeHeartSegment_ErrorMap_WhiteBg.gif"
+    if os.path.exists(gif_path):
+        st.image(gif_path, width=500)
+    else:
+        st.error(f"Error opening '{gif_path}'. File not found.")
+    
     st.title("3D Heart MRI Image Segmentation")
     st.subheader("AI driven apps made by Md Abu Sufian")
     st.header("👈🏽 Select the Image Source options")
