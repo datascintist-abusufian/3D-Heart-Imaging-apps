@@ -4,7 +4,6 @@ from PIL import Image
 import os
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-import time
 from torchvision.transforms import transforms
 from io import BytesIO
 
@@ -20,11 +19,9 @@ def load_model():
         
         url = 'https://archive.org/download/yoloTrained/yoloTrained.pt'
         
-        start_dl = time.time()  # Start the timer
-        
         # Download the model
         try:
-            response = requests.get(url, stream=True, verify=False)  # Note: verify=False bypasses SSL certificate verification
+            response = requests.get(url, stream=True, verify=False)
             if response.status_code == 200:
                 with open(model_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -36,25 +33,20 @@ def load_model():
         except Exception as e:
             st.error(f"Error during model download: {e}")
             return None
-
-        finished_dl = time.time()  # End the timer
-        st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
     
     try:
-        model = torch.load(model_path, map_location=torch.device('cpu'))  # Load model on CPU to avoid GPU dependencies
-        model.eval()  # Set the model to evaluation mode
+        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model.eval()
     except Exception as e:
         st.error(f"Error loading model: {e}")
         return None
     
-    st.write(f"Model type: {type(model)}")  # Print model type to Streamlit
     return model
 
 # Process the image to a tensor
 def process_image(image):
     transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.Resize((256, 256)),
         transforms.ToTensor(),
     ])
     
@@ -76,19 +68,15 @@ def imageInput(src, model):
                 try:
                     with torch.no_grad():
                         pred = model(img_tensor)
-                        # Assuming your model has a render function
                         pred.render()
                         for im in pred.ims:
                             im_base64 = Image.fromarray(im)
-                            # Handling for display in Streamlit
                             st.image(im_base64, caption='Predicted Heart Segmentation')
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
 
     elif src == 'From sample Images':
-        # Using a specific image URL for demonstration purposes
         image_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/1.jpg"
-
         try:
             response = requests.get(image_url)
             image = Image.open(BytesIO(response.content))
@@ -96,11 +84,9 @@ def imageInput(src, model):
             if img_tensor is not None:
                 with torch.no_grad():
                     pred = model(img_tensor)
-                    # Assuming your model has a render function
                     pred.render()
                     for im in pred.ims:
                         im_base64 = Image.fromarray(im)
-                        # Handling for display in Streamlit
                         st.image(im_base64, caption='Predicted Heart Segmentation')
         except Exception as e:
             st.error(f"Error during prediction: {e}")
