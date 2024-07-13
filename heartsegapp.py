@@ -41,7 +41,7 @@ def load_model():
         st.write(f"Model Downloaded in {finished_dl-start_dl:.2f} seconds")
     
     try:
-        model = torch.load(model_path)
+        model = torch.load(model_path, map_location=torch.device('cpu'))  # Load model on CPU to avoid GPU dependencies
         model.eval()  # Set the model to evaluation mode
     except Exception as e:
         st.error(f"Error loading model: {e}")
