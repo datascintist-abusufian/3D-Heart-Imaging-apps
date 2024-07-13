@@ -10,14 +10,18 @@ from io import BytesIO
 # Cache the model loading
 @st.cache_resource
 def load_model():
-    model_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/models/yolov5s.pt"
+    model_dir = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/models"
+    model_path = os.path.join(model_dir, "yolov5s.pt")
+
+    # Ensure the models directory exists
+    os.makedirs(model_dir, exist_ok=True)
 
     # Check if model exists
     if not os.path.exists(model_path):
         # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         
-        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
+        url = 'https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt?raw=true'
         
         # Download the model
         try:
@@ -93,7 +97,17 @@ def image_input(src, model):
 
 # Main function
 def main():
+    gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/WholeHeartSegment_ErrorMap_WhiteBg.gif"
+    
+    if not os.path.exists(gif_path):
+        try:
+            response = requests.get(gif_url)
+            with open(gif_path, 'wb') as f:
+                f.write(response.content)
+        except Exception as e:
+            st.error(f"Error downloading gif: {e}")
+    
     if os.path.exists(gif_path):
         try:
             st.image(gif_path, width=500)
