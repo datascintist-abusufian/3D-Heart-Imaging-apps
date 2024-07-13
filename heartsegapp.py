@@ -7,20 +7,16 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
 
-# Cache the model loading
 @st.cache_resource
 def load_model():
     st.write("Loading model...")
     model_path = "models/yolov5s.pt"
 
-    # Check if model exists
     if not os.path.exists(model_path):
-        # Disable SSL warnings
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         
         url = 'https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/models/yolov5s.pt?raw=true'
         
-        # Download the model
         try:
             st.write("Downloading model from URL...")
             response = requests.get(url, stream=True, verify=False)
@@ -48,7 +44,6 @@ def load_model():
     
     return model
 
-# Process the image to a tensor
 def process_image(image):
     st.write("Processing image...")
     transform = transforms.Compose([
@@ -64,7 +59,6 @@ def process_image(image):
         st.error(f"Error processing image: {e}")
         return None
 
-# Function to handle image input
 def image_input(src, model):
     if src == 'Upload your own Image':
         uploaded_file = st.file_uploader("Choose an image...", type="jpg")
@@ -104,7 +98,6 @@ def image_input(src, model):
         except Exception as e:
             st.error(f"Error downloading sample image: {e}")
 
-# Main function
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
