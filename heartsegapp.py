@@ -95,7 +95,10 @@ def image_input(src, model):
 def main():
     gif_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/WholeHeartSegment_ErrorMap_WhiteBg.gif"
     if os.path.exists(gif_path):
-        st.image(gif_path, width=500)
+        try:
+            st.image(gif_path, width=500)
+        except Exception as e:
+            st.error(f"Error displaying image: {e}")
     else:
         st.error(f"Error opening '{gif_path}'. File not found.")
     
