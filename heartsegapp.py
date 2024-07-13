@@ -9,18 +9,21 @@ from io import BytesIO
 
 @st.cache_resource
 def load_model():
+    st.write("Loading model...")
     model_path = "models/yolov5s.pt"
-    
+
     if not os.path.exists(model_path):
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         url = 'https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/models/yolov5s.pt?raw=true'
         
         try:
+            st.write("Downloading model from URL...")
             response = requests.get(url, stream=True, verify=False)
             if response.status_code == 200:
                 with open(model_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
+                st.write("Model downloaded successfully.")
             else:
                 st.error("Failed to download the model")
                 return None
@@ -29,8 +32,10 @@ def load_model():
             return None
     
     try:
+        st.write("Loading model from path...")
         model = torch.load(model_path, map_location=torch.device('cpu'))
         model.eval()
+        st.write("Model loaded successfully.")
     except Exception as e:
         st.error(f"Error loading model: {e}")
         return None
@@ -38,6 +43,7 @@ def load_model():
     return model
 
 def process_image(image):
+    st.write("Processing image...")
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
@@ -45,6 +51,7 @@ def process_image(image):
     
     try:
         image = transform(image).unsqueeze(0)
+        st.write("Image processed successfully.")
         return image
     except Exception as e:
         st.error(f"Error processing image: {e}")
@@ -55,9 +62,11 @@ def image_input(src, model):
         uploaded_file = st.sidebar.file_uploader("Choose an image...", type="jpg")
         if uploaded_file is not None:
             img = Image.open(uploaded_file)
+            st.image(img, caption='Uploaded Image', use_column_width=True)  # Display the uploaded image
             img_tensor = process_image(img)
             if img_tensor is not None:
                 try:
+                    st.write("Making prediction...")
                     with torch.no_grad():
                         pred = model(img_tensor)
                         pred.render()
@@ -70,11 +79,14 @@ def image_input(src, model):
     elif src == 'From sample Images':
         image_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/1.jpg"
         try:
+            st.write("Downloading sample image from URL...")
             response = requests.get(image_url)
             image = Image.open(BytesIO(response.content))
+            st.image(image, caption='Sample Image', use_column_width=True)  # Display the sample image
             img_tensor = process_image(image)
             if img_tensor is not None:
                 try:
+                    st.write("Making prediction...")
                     with torch.no_grad():
                         pred = model(img_tensor)
                         pred.render()
@@ -92,9 +104,11 @@ def main():
     
     if not os.path.exists(gif_path):
         try:
+            st.write("Downloading GIF from URL...")
             response = requests.get(gif_url)
             with open(gif_path, 'wb') as f:
                 f.write(response.content)
+            st.write("GIF downloaded successfully.")
         except Exception as e:
             st.error(f"Error downloading gif: {e}")
     
