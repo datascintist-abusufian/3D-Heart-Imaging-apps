@@ -194,7 +194,7 @@ def main():
             st.image(gif_path, width=500)
         except Exception as e:
             st.error(f"Error displaying image: {e}")
-    else:
+        else:
     st.error(f"Error opening '{gif_path}'. File not found.")
 
 st.title("3D Heart MRI Image Segmentation")
