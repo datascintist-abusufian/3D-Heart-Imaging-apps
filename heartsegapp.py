@@ -169,16 +169,16 @@ def image_input(src, model, ground_truth):
             img_tensor = process_image(image)
             if img_tensor is not None:
                 try:
-                st.write("Making prediction...")
-                results = model(img_tensor)[0]  # Corrected prediction call
-                img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
-                st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
+                    st.write("Making prediction...")
+                    results = model(img_tensor)[0]  # Corrected prediction call
+                    img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
+                    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                 iou_scores = analyze_results(results, ground_truth, image_name)
                 plot_distribution(iou_scores)
             except Exception as e:
-                st.error(f"Error during prediction: {e}")
+                    st.error(f"Error during prediction: {e}")
     except Exception as e:
-        st.error(f"Error downloading sample image: {e}")
+                    st.error(f"Error downloading sample image: {e}")
 
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
