@@ -174,7 +174,6 @@ def image_input(src, model, ground_truth):
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
             st.error(f"Error downloading sample image: {e}")
-
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
@@ -188,7 +187,7 @@ def main():
             st.write("GIF downloaded successfully.")
         except Exception as e:
             st.error(f"Error downloading gif: {e}")
-    
+
     if os.path.exists(gif_path):
         try:
             st.image(gif_path, width=500)
@@ -197,16 +196,18 @@ def main():
     else:
         st.error(f"Error opening '{gif_path}'. File not found.")
 
-        st.title("3D Heart MRI Image Segmentation")
-        st.subheader("AI driven apps made by Md Abu Sufian“)
-                 
-st.header(“👈🏽 Select the Image Source options”)
-st.sidebar.title(‘⚙️Options’)src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+    st.title("3D Heart MRI Image Segmentation")
+    st.subheader("AI driven apps made by Md Abu Sufian")
+    st.header("👈🏽 Select the Image Source options")
+    st.sidebar.title('⚙️Options')
 
-model = load_model()
-ground_truth = load_ground_truth()
+    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-if model is not None and ground_truth is not None:
-    image_input(src, model, ground_truth)
-    if name == ‘main’:
-main()
+    model = load_model()
+    ground_truth = load_ground_truth()
+
+    if model is not None and ground_truth is not None:
+        image_input(src, model, ground_truth)
+
+if __name__ == '__main__':
+    main()
