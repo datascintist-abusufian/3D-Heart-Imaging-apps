@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
 # Ground truth data file path (assuming it's a CSV file)
-ground_truth_path = "ground_truth.csv"
+ground_truth_path = "ground_truth.jpg"
 
 @st.cache_resource
 def load_model():
