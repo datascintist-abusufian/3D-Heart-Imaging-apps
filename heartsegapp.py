@@ -179,7 +179,6 @@ def image_input(src, model, ground_truth):
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
             st.error(f"Error downloading sample image: {e}”)
-            
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
