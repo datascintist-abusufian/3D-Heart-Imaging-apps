@@ -162,13 +162,13 @@ def image_input(src, model, ground_truth):
         image_name = f"{selected_image}.jpg"
         image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
         try:
-        st.write("Downloading sample image from URL...")
-        response = requests.get(image_url)
-        image = Image.open(BytesIO(response.content)).convert("RGB")
-        st.image(image, caption='Sample Image', use_column_width=False, width=300)
-        img_tensor = process_image(image)
-        if img_tensor is not None:
-            try:
+            st.write("Downloading sample image from URL...")
+            response = requests.get(image_url)
+            image = Image.open(BytesIO(response.content)).convert("RGB")
+            st.image(image, caption='Sample Image', use_column_width=False, width=300)
+            img_tensor = process_image(image)
+            if img_tensor is not None:
+                try:
                 st.write("Making prediction...")
                 results = model(img_tensor)[0]  # Corrected prediction call
                 img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
