@@ -188,22 +188,25 @@ def main():
             st.write("GIF downloaded successfully.")
         except Exception as e:
             st.error(f"Error downloading gif: {e}")
-            
-    if os.path.exists(gif_path):
-        try:
-            st.image(gif_path, width=500)
-        except Exception as e:
-            st.error(f"Error displaying image: {e}")
-    else:
-        st.error(f"Error opening '{gif_path}'. File not found.")
-    st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by Md Abu Sufian")
-    st.header("👈🏽 Select the Image Source options")
-    st.sidebar.title('⚙️Options')
-    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload Image’])
-    model = load_model()
-    ground_truth = load_ground_truth()
-    if model is not None and ground_truth is not None:
+            if os.path.exists(gif_path):
+    try:
+        st.image(gif_path, width=500)
+    except Exception as e:
+        st.error(f"Error displaying image: {e}")
+else:
+    st.error(f"Error opening '{gif_path}'. File not found.")
+
+st.title("3D Heart MRI Image Segmentation")
+st.subheader("AI driven apps made by Md Abu Sufian")
+st.header("👈🏽 Select the Image Source options")
+st.sidebar.title('⚙️Options')
+src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+
+model = load_model()
+ground_truth = load_ground_truth()
+
+if model is not None and ground_truth is not None:
     image_input(src, model, ground_truth)
-    if name == ‘main’:
+
+if __name__ == '__main__':
     main()
