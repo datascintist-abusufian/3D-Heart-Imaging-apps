@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 # Path to the local model file
-model_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/yolov5s.pt"
+model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
 @st.cache_resource
 def load_model():
