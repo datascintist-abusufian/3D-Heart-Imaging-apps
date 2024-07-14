@@ -156,7 +156,6 @@ def image_input(src, model, ground_truth):
                     plot_distribution(iou_scores)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
-
     elif src == 'From sample Images':
     selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
     image_name = f"{selected_image}.jpg"
