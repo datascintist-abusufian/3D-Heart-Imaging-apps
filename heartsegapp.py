@@ -13,13 +13,18 @@ model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/bl
 
 @st.cache_resource
 def load_model():
-    if not os.path.exists(model_path):
-        st.error(f"Model file not found at {model_path}")
-        return None
-
+    # Download model if not present locally
+    model_file = "yolov5s.pt"
+    if not os.path.exists(model_file):
+        st.write("Downloading model...")
+        response = requests.get(model_path)
+        with open(model_file, 'wb') as f:
+            f.write(response.content)
+        st.write("Model downloaded successfully.")
+    
     try:
         st.write("Loading model from path...")
-        model = YOLO(model_path)  # Load YOLOv5 model
+        model = YOLO(model_file)  # Load YOLOv5 model
         st.write("Model loaded successfully.")
     except Exception as e:
         st.error(f"Error loading model: {e}")
@@ -45,8 +50,8 @@ def process_image(image):
 def draw_bboxes(image, results):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
-    for box in results.xyxy[0]:
-        x1, y1, x2, y2, conf, cls_id = box.int().tolist()
+    for result in results.xyxy[0]:
+        x1, y1, x2, y2, conf, cls_id = result.int().tolist()
         label = class_names.get(cls_id, 'Unknown')
         score = conf
 
@@ -70,7 +75,7 @@ def image_input(src, model):
             if img_tensor is not None:
                 try:
                     st.write("Making prediction...")
-                    results = model(img_tensor)[0]  # Corrected prediction call
+                    results = model(img_tensor)  # Corrected prediction call
                     img_with_bboxes = draw_bboxes(img, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                 except Exception as e:
@@ -88,7 +93,7 @@ def image_input(src, model):
             if img_tensor is not None:
                 try:
                     st.write("Making prediction...")
-                    results = model(img_tensor)[0]  # Corrected prediction call
+                    results = model(img_tensor)  # Corrected prediction call
                     img_with_bboxes = draw_bboxes(image, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                 except Exception as e:
