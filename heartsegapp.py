@@ -201,7 +201,6 @@ def main():
     st.subheader("AI driven apps made by Md Abu Sufian")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
-
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image’])
     model = load_model()
 ground_truth = load_ground_truth()
