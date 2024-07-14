@@ -187,8 +187,7 @@ def main():
                 f.write(response.content)
             st.write("GIF downloaded successfully.")
         except Exception as e:
-            st.error(f"Error downloading gif: {e}")
-            
+            st.error(f"Error downloading gif: {e}")    
     if os.path.exists(gif_path):
     try:
         st.image(gif_path, width=500)
