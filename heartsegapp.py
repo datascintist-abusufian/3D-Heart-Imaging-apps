@@ -189,7 +189,7 @@ def main():
             with open(gif_path, 'wb') as f:
                 f.write(response.content)
             st.write("GIF downloaded successfully.")
-    except
+except
 Exception as e:
 st.error(f”Error downloading gif: {e}”)
 if os.path.exists(gif_path):
