@@ -203,9 +203,9 @@ def main():
     st.sidebar.title('⚙️Options')
     src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image’])
     model = load_model()
-ground_truth = load_ground_truth()
+    ground_truth = load_ground_truth()
 
-if model is not None and ground_truth is not None:
+    if model is not None and ground_truth is not None:
     image_input(src, model, ground_truth)
     if name == ‘main’:
-main()
+    main()
