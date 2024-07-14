@@ -196,15 +196,13 @@ def main():
             st.error(f"Error displaying image: {e}")
     else:
         st.error(f"Error opening '{gif_path}'. File not found.")
-
     st.title("3D Heart MRI Image Segmentation")
     st.subheader("AI driven apps made by Md Abu Sufian")
     st.header("👈🏽 Select the Image Source options")
     st.sidebar.title('⚙️Options')
-    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image’])
+    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload Image’])
     model = load_model()
     ground_truth = load_ground_truth()
-
     if model is not None and ground_truth is not None:
     image_input(src, model, ground_truth)
     if name == ‘main’:
