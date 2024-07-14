@@ -198,7 +198,7 @@ def main():
         st.error(f"Error opening '{gif_path}'. File not found.")
 
     st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by Md Abu Sufian“)
+    st.subheader("AI driven apps made by Md Abu Sufian“) 
 st.header(“👈🏽 Select the Image Source options”)
 st.sidebar.title(‘⚙️Options’)src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
