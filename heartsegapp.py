@@ -7,14 +7,14 @@ from torchvision.transforms import transforms
 from io import BytesIO
 import numpy as np
 import cv2
-import pandas as pd
+import json
 import matplotlib.pyplot as plt
 
 # Path to the local model file
 model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
-# Ground truth data file path (assuming it's a CSV file)
-ground_truth_path = "ground_truth.csv"
+# Ground truth data file path (assuming it's a JSON file)
+ground_truth_path = "annotations.json"
 
 @st.cache_resource
 def load_model():
@@ -42,14 +42,14 @@ def load_ground_truth():
         return None
 
     try:
-        gt_data = pd.read_csv(ground_truth_path)
+        with open(ground_truth_path, 'r') as f:
+            gt_data = json.load(f)
         st.write("Ground truth data loaded successfully.")
     except Exception as e:
         st.error(f"Error loading ground truth data: {e}")
         return None
 
     return gt_data
-
 def process_image(image):
     st.write("Processing image...")
     transform = transforms.Compose([
@@ -83,16 +83,15 @@ def draw_bboxes(image, results, ground_truth=None, image_name=None):
         cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
         cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-    if ground_truth is not None and image_name in ground_truth['image_name'].values:
-        gt_records = ground_truth[ground_truth['image_name'] == image_name]
-        for idx, gt in gt_records.iterrows():
+    if ground_truth is not None and image_name in ground_truth:
+        gt_records = ground_truth[image_name]
+        for gt in gt_records:
             x1, y1, x2, y2, cls_id = gt['x1'], gt['y1'], gt['x2'], gt['y2'], gt['cls_id']
             label = class_names.get(cls_id, 'Unknown')
-            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-            cv2.putText(img, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
     return img
-
 def calculate_iou(pred_box, gt_box):
     x1_p, y1_p, x2_p, y2_p = pred_box
     x1_g, y1_g, x2_g, y2_g = gt_box
@@ -118,9 +117,9 @@ def analyze_results(results, ground_truth, image_name):
         pred_cls = int(result[5])
         pred_conf = result[4].item()
 
-        if image_name in ground_truth['image_name'].values:
-            gt_records = ground_truth[ground_truth['image_name'] == image_name]
-            for idx, gt in gt_records.iterrows():
+        if image_name in ground_truth:
+            gt_records = ground_truth[image_name]
+            for gt in gt_records:
                 gt_box = [gt['x1'], gt['y1'], gt['x2'], gt['y2']]
                 gt_cls = gt['cls_id']
 
@@ -137,7 +136,6 @@ def plot_distribution(iou_scores):
     ax.set_xlabel('IoU Score')
     ax.set_ylabel('Frequency')
     st.pyplot(fig)
-
 def image_input(src, model, ground_truth):
     if src == 'Upload your own Image':
         uploaded_file = st.sidebar.file_uploader("Choose an image...", type="jpg")
@@ -156,7 +154,7 @@ def image_input(src, model, ground_truth):
                     plot_distribution(iou_scores)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
-                    
+
     elif src == 'From sample Images':
         selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
         image_name = f"{selected_image}.jpg"
@@ -168,17 +166,17 @@ def image_input(src, model, ground_truth):
             st.image(image, caption='Sample Image', use_column_width=False, width=300)
             img_tensor = process_image(image)
             if img_tensor is not None:
-try:
-    st.write("Making prediction...")
-    results = model(img_tensor)[0]  # Corrected prediction call
-    img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
-    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
-    iou_scores = analyze_results(results, ground_truth, image_name)
-    plot_distribution(iou_scores)
-except Exception as e:
-    st.error(f"Error during prediction: {e}")
-except Exception as e:
-    st.error(f"Error downloading sample image: {e}")
+                try:
+                    st.write("Making prediction...")
+                    results = model(img_tensor)[0]  # Corrected prediction call
+                    img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
+                    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
+                    iou_scores = analyze_results(results, ground_truth, image_name)
+                    plot_distribution(iou_scores)
+                except Exception as e:
+                    st.error(f"Error during prediction: {e}")
+        except Exception as e:
+            st.error(f"Error downloading sample image: {e}")
 
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
@@ -191,29 +189,28 @@ def main():
             with open(gif_path, 'wb') as f:
                 f.write(response.content)
             st.write("GIF downloaded successfully.")
-        except Exception as e:
-            st.error(f"Error downloading gif: {e}")
+        except
+Exception as e:
+st.error(f”Error downloading gif: {e}”)
+if os.path.exists(gif_path):
+    try:
+        st.image(gif_path, width=500)
+    except Exception as e:
+        st.error(f"Error displaying image: {e}")
+else:
+    st.error(f"Error opening '{gif_path}'. File not found.")
 
-    if os.path.exists(gif_path):
-        try:
-            st.image(gif_path, width=500)
-        except Exception as e:
-            st.error(f"Error displaying image: {e}")
-    else:
-        st.error(f"Error opening '{gif_path}'. File not found.")
+st.title("3D Heart MRI Image Segmentation")
+st.subheader("AI driven apps made by Md Abu Sufian")
+st.header("👈🏽 Select the Image Source options")
+st.sidebar.title('⚙️Options')
 
-    st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by Md Abu Sufian")
-    st.header("👈🏽 Select the Image Source options")
-    st.sidebar.title('⚙️Options')
+src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+model = load_model()
+ground_truth = load_ground_truth()
 
-    model = load_model()
-    ground_truth = load_ground_truth()
-
-    if model is not None and ground_truth is not None:
-        image_input(src, model, ground_truth)
-
-if __name__ == '__main__':
-    main()
+if model is not None and ground_truth is not None:
+    image_input(src, model, ground_truth)
+if name == ‘main’:
+main()
