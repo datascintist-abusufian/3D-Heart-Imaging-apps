@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
 # Ground truth data file path (assuming it's a CSV file)
-ground_truth_path = "ground_truth.jpg"
+ground_truth_path = "ground_truth.csv"
 
 @st.cache_resource
 def load_model():
@@ -198,17 +198,14 @@ def main():
         st.error(f"Error opening '{gif_path}'. File not found.")
 
     st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by Md Abu Sufian")
-    st.header("👈🏽 Select the Image Source options")
-    st.sidebar.title('⚙️Options')
+    st.subheader("AI driven apps made by Md Abu Sufian“)
+st.header(“👈🏽 Select the Image Source options”)
+st.sidebar.title(‘⚙️Options’)src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+model = load_model()
+ground_truth = load_ground_truth()
 
-    model = load_model()
-    ground_truth = load_ground_truth()
-
-    if model is not None and ground_truth is not None:
-        image_input(src, model, ground_truth)
-
-if __name__ == '__main__':
-    main()
+if model is not None and ground_truth is not None:
+    image_input(src, model, ground_truth)
+    if name == ‘main’:
+main()
