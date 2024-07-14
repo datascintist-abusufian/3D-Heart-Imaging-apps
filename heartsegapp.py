@@ -168,7 +168,7 @@ def image_input(src, model, ground_truth):
             st.image(image, caption='Sample Image', use_column_width=False, width=300)
             img_tensor = process_image(image)
             if img_tensor is not None:
-                try:
+try:
     st.write("Making prediction...")
     results = model(img_tensor)[0]  # Corrected prediction call
     img_with_bboxes = draw_bboxes(image, results, ground_truth, image_name)
