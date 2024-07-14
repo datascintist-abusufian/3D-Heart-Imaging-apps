@@ -7,14 +7,14 @@ from torchvision.transforms import transforms
 from io import BytesIO
 import numpy as np
 import cv2
-import json
+import pandas as pd
 import matplotlib.pyplot as plt
 
 # Path to the local model file
 model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
-# Ground truth data file path (assuming it's a JSON file)
-ground_truth_path = "ground_truth.json"
+# Ground truth data file path (assuming it's a CSV file)
+ground_truth_path = "ground_truth.csv"
 
 @st.cache_resource
 def load_model():
@@ -42,8 +42,7 @@ def load_ground_truth():
         return None
 
     try:
-        with open(ground_truth_path, 'r') as f:
-            gt_data = json.load(f)
+        gt_data = pd.read_csv(ground_truth_path)
         st.write("Ground truth data loaded successfully.")
     except Exception as e:
         st.error(f"Error loading ground truth data: {e}")
@@ -84,12 +83,13 @@ def draw_bboxes(image, results, ground_truth=None, image_name=None):
         cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
         cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-    if ground_truth is not None and image_name in ground_truth:
-        for gt in ground_truth[image_name]:
+    if ground_truth is not None and image_name in ground_truth['image_name'].values:
+        gt_records = ground_truth[ground_truth['image_name'] == image_name]
+        for idx, gt in gt_records.iterrows():
             x1, y1, x2, y2, cls_id = gt['x1'], gt['y1'], gt['x2'], gt['y2'], gt['cls_id']
             label = class_names.get(cls_id, 'Unknown')
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+            cv2.putText(img, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
     return img
 
@@ -118,8 +118,9 @@ def analyze_results(results, ground_truth, image_name):
         pred_cls = int(result[5])
         pred_conf = result[4].item()
 
-        if image_name in ground_truth:
-            for gt in ground_truth[image_name]:
+        if image_name in ground_truth['image_name'].values:
+            gt_records = ground_truth[ground_truth['image_name'] == image_name]
+            for idx, gt in gt_records.iterrows():
                 gt_box = [gt['x1'], gt['y1'], gt['x2'], gt['y2']]
                 gt_cls = gt['cls_id']
 
@@ -177,7 +178,8 @@ def image_input(src, model, ground_truth):
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
-            st.error(f"Error downloading sample image: {e}")
+            st.error(f"Error downloading sample image: {e}”)
+            
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
@@ -191,7 +193,7 @@ def main():
             st.write("GIF downloaded successfully.")
         except Exception as e:
             st.error(f"Error downloading gif: {e}")
-    
+
     if os.path.exists(gif_path):
         try:
             st.image(gif_path, width=500)
