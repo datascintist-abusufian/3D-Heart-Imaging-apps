@@ -2,50 +2,22 @@ import streamlit as st
 import torch
 from PIL import Image
 import os
-import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
+from ultralytics import YOLO
 
-# Function to download and verify the model
-def download_model():
-    st.write("Downloading model...")
-    model_path = "models/yolov5s.pt"
-    url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
-
-    # Known file size of yolov5s.pt
-    expected_size = 14602242
-
-    if not os.path.exists(model_path) or os.path.getsize(model_path) != expected_size:
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-        try:
-            with requests.get(url, stream=True, verify=False) as r:
-                r.raise_for_status()
-                with open(model_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-            st.write("Model downloaded successfully.")
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error during model download: {e}")
-            return None
-
-    # Verify the file size
-    if os.path.getsize(model_path) != expected_size:
-        st.error("Downloaded model file size is incorrect. The file may be corrupted.")
-        os.remove(model_path)
-        return None
-
-    return model_path
+# Path to the local model file
+model_path = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/yolov5s.pt"
 
 @st.cache_resource
 def load_model():
-    model_path = download_model()
-    if model_path is None:
+    if not os.path.exists(model_path):
+        st.error(f"Model file not found at {model_path}")
         return None
     
     try:
         st.write("Loading model from path...")
-        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model = YOLO(model_path)  # Load YOLOv5 model
         model.eval()
         st.write("Model loaded successfully.")
     except Exception as e:
@@ -79,12 +51,11 @@ def image_input(src, model):
             if img_tensor is not None:
                 try:
                     st.write("Making prediction...")
-                    with torch.no_grad():
-                        results = model(img_tensor)
-                        results.render()
-                        for img in results.ims:
-                            img_pil = Image.fromarray(img)
-                            st.image(img_pil, caption='Predicted Heart Segmentation')
+                    results = model(img_tensor)
+                    results.render()  # Assuming this method exists in the loaded model
+                    for img in results.ims:
+                        img_pil = Image.fromarray(img)
+                        st.image(img_pil, caption='Predicted Heart Segmentation')
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
 
@@ -99,12 +70,11 @@ def image_input(src, model):
             if img_tensor is not None:
                 try:
                     st.write("Making prediction...")
-                    with torch.no_grad():
-                        results = model(img_tensor)
-                        results.render()
-                        for img in results.ims:
-                            img_pil = Image.fromarray(img)
-                            st.image(img_pil, caption='Predicted Heart Segmentation')
+                    results = model(img_tensor)
+                    results.render()  # Assuming this method exists in the loaded model
+                    for img in results.ims:
+                        img_pil = Image.fromarray(img)
+                        st.image(img_pil, caption='Predicted Heart Segmentation')
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
