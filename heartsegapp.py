@@ -6,29 +6,35 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from torchvision.transforms import transforms
 from io import BytesIO
-from ultralytics import YOLO
 
-@st.cache_resource
+# Function to download and verify the model
 def download_model():
     st.write("Downloading model...")
     model_path = "models/yolov5s.pt"
-    if not os.path.exists(model_path):
+    url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
+
+    # Known file size of yolov5s.pt
+    expected_size = 14602242
+
+    if not os.path.exists(model_path) or os.path.getsize(model_path) != expected_size:
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5s.pt'
-        
         try:
-            response = requests.get(url, stream=True, verify=False)
-            if response.status_code == 200:
+            with requests.get(url, stream=True, verify=False) as r:
+                r.raise_for_status()
                 with open(model_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
+                    for chunk in r.iter_content(chunk_size=8192):
                         f.write(chunk)
-                st.write("Model downloaded successfully.")
-            else:
-                st.error("Failed to download the model")
-                return None
+            st.write("Model downloaded successfully.")
         except requests.exceptions.RequestException as e:
             st.error(f"Error during model download: {e}")
             return None
+
+    # Verify the file size
+    if os.path.getsize(model_path) != expected_size:
+        st.error("Downloaded model file size is incorrect. The file may be corrupted.")
+        os.remove(model_path)
+        return None
+
     return model_path
 
 @st.cache_resource
@@ -39,7 +45,7 @@ def load_model():
     
     try:
         st.write("Loading model from path...")
-        model = YOLO(model_path)
+        model = torch.load(model_path, map_location=torch.device('cpu'))
         model.eval()
         st.write("Model loaded successfully.")
     except Exception as e:
