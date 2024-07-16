@@ -27,7 +27,7 @@ def load_model():
     model_file = "yolov5s.pt"
     if not os.path.exists(model_file):
         st.write("Downloading model...")
-        response = requests.get(model_path)
+        response = requests.get(MODEL_PATH)
         with open(model_file, 'wb') as f:
             f.write(response.content)
         st.write("Model downloaded successfully.")
@@ -56,6 +56,7 @@ def load_ground_truth():
         return None
 
     return gt_data
+
 def process_image(image):
     st.write("Processing image...")
     transform = transforms.Compose([
@@ -98,6 +99,7 @@ def draw_bboxes(image, results, ground_truth=None, image_name=None):
             cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
     return img
+
 def calculate_iou(pred_box, gt_box):
     x1_p, y1_p, x2_p, y2_p = pred_box
     x1_g, y1_g, x2_g, y2_g = gt_box
@@ -142,6 +144,7 @@ def plot_distribution(iou_scores):
     ax.set_xlabel('IoU Score')
     ax.set_ylabel('Frequency')
     st.pyplot(fig)
+
 def image_input(src, model, ground_truth):
     if src == 'Upload your own Image':
         uploaded_file = st.sidebar.file_uploader("Choose an image...", type="jpg")
@@ -186,18 +189,17 @@ def image_input(src, model, ground_truth):
 
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
-    gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
-
+    gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif”
     if not os.path.exists(gif_path):
-        try:
-            st.write("Downloading GIF from URL...")
-            response = requests.get(gif_url)
-            with open(gif_path, 'wb') as f:
-                f.write(response.content)
-            st.write("GIF downloaded successfully.")
-         except
-Exception as e:
-st.error(f”Error downloading gif: {e}”)
+    try:
+        st.write("Downloading GIF from URL...")
+        response = requests.get(gif_url)
+        with open(gif_path, 'wb') as f:
+            f.write(response.content)
+        st.write("GIF downloaded successfully.")
+    except Exception as e:
+        st.error(f"Error downloading gif: {e}")
+
 if os.path.exists(gif_path):
     try:
         st.image(gif_path, width=500)
