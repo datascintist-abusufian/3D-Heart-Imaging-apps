@@ -141,6 +141,7 @@ def image_input(src, model):
                         st.write(f"Recall: {recall:.2f}")
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
+
 elif src == 'From sample Images':
     selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
     image_name = f"{selected_image}.jpg"
