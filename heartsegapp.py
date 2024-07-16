@@ -206,6 +206,7 @@ src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload yo
 model = load_model()
 
 if model is not None:
-    image_input(src, model)
-    if name == ‘main’:
-main()
+        image_input(src, model)
+
+if __name__ == '__main__':
+    main()
