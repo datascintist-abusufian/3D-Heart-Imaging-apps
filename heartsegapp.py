@@ -10,10 +10,10 @@ import cv2
 import matplotlib.pyplot as plt
 
 # --- Configuration ---
-MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/train.py"  # Replace with the path to your trained model weights
+MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"  # Ensure correct URL
+MODEL_PATH = "yolov5s.pt"
 GIF_PATH = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
 SAMPLE_IMAGES_DIR = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/tree/main/data/images/test"
-LABELS_DIR = SAMPLE_IMAGES_DIR  # Assuming labels are in the same directory
 CLASS_NAMES = {0: 'left ventricle', 1: 'right ventricle'}
 THRESHOLD = 0.5  # Confidence threshold for considering a detection as correct
 
@@ -21,9 +21,12 @@ THRESHOLD = 0.5  # Confidence threshold for considering a detection as correct
 def load_model():
     model_file = MODEL_PATH
     if not os.path.exists(model_file):
-        st.error(f"Model file not found at {model_file}")
-        return None
-
+        st.write("Downloading model...")
+        response = requests.get(MODEL_URL)
+        with open(model_file, 'wb') as f:
+            f.write(response.content)
+        st.write("Model downloaded successfully.")
+    
     try:
         st.write("Loading model from path...")
         model = YOLO(model_file)  # Load YOLOv5 model
