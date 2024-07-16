@@ -52,7 +52,7 @@ def process_image(image):
         st.error(f"Error processing image: {e}")
         return None
 
-def draw_bboxes(image, results):
+def draw_bboxes_and_masks(image, results):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
 
@@ -73,7 +73,15 @@ def draw_bboxes(image, results):
 
                 cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
                 cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    
+
+                # Draw segmentation mask
+                if results.masks is not None:
+                    mask = results.masks[0].cpu().numpy()  # Assuming there's only one mask per box
+                    mask = cv2.resize(mask, (x2 - x1, y2 - y1))
+                    mask = (mask > 0.5).astype(np.uint8) * 255
+                    roi = img[y1:y2, x1:x2]
+                    roi[np.where(mask == 255)] = (0, 255, 0)  # Overlay the mask with green color
+
     return img
 
 def image_input(src, model):
@@ -88,7 +96,7 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes = draw_bboxes(img, results)
+                    img_with_bboxes = draw_bboxes_and_masks(img, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
@@ -107,7 +115,7 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes = draw_bboxes(image, results)
+                    img_with_bboxes = draw_bboxes_and_masks(image, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
