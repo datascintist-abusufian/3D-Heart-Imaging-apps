@@ -56,6 +56,9 @@ def draw_bboxes_and_masks(image, results):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
 
+    st.write(f"Number of bounding boxes: {len(results.boxes) if results.boxes is not None else 0}")
+    st.write(f"Number of masks: {len(results.masks) if results.masks is not None else 0}")
+
     if results.boxes is not None:
         for i, box in enumerate(results.boxes):
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -77,6 +80,7 @@ def draw_bboxes_and_masks(image, results):
                 # Draw segmentation mask
                 if results.masks is not None and len(results.masks) > i:
                     mask = results.masks[i].cpu().numpy()  # Get the corresponding mask
+                    st.write(f"Mask shape for bounding box {i}: {mask.shape}")
                     mask = cv2.resize(mask, (x2 - x1, y2 - y1))
                     mask = (mask > 0.5).astype(np.uint8) * 255
                     roi = img[y1:y2, x1:x2]
