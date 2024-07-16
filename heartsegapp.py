@@ -176,7 +176,7 @@ def image_input(src, model):
             st.error(f"Error downloading sample image: {e}")
 
 def main():
-    gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true”
+gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true”
 gif_path = “WholeHeartSegment_ErrorMap_WhiteBg.gif”
 if not os.path.exists(gif_path):
     try:
