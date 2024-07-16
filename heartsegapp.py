@@ -142,68 +142,71 @@ def image_input(src, model):
                     st.error(f"Error during prediction: {e}")
 
     elif src == 'From sample Images':
-        selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
-        image_name = f"{selected_image}.jpg"
-        image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
-        try:
-            st.write("Downloading sample image from URL...")
-            response = requests.get(image_url)
-            image = Image.open(BytesIO(response.content)).convert("RGB")
-            st.image(image, caption='Sample Image', use_column_width=False, width=300)
-            img_tensor = process_image(image)
-            if img_tensor is not None:
-                try:
-                    st.write("Making prediction...")
-                    results = model(img_tensor)[0]  # Corrected prediction call
-                    
-                    # Load ground truth mask for comparison (replace with actual loading mechanism)
-                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
-                    img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results, ground_truth_mask)
-                    
-                    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
-                    plot_distribution(confidence_scores)
-                    
-                    if ground_truth_mask is not None:
-                        dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
-                        st.write(f"Dice Coefficient: {dice:.2f}")
-                        st.write(f"IoU: {iou:.2f}")
-                        st.write(f"Precision: {precision:.2f}”)
-st.write(f”Recall: {recall:.2f}”)
-except Exception as e:
-st.error(f”Error during prediction: {e}”)
-except Exception as e:
-st.error(f”Error downloading sample image: {e}”)
+    selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
+    image_name = f"{selected_image}.jpg"
+    image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
+    try:
+        st.write("Downloading sample image from URL...")
+        response = requests.get(image_url)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        st.image(image, caption='Sample Image', use_column_width=False, width=300)
+        img_tensor = process_image(image)
+        if img_tensor is not None:
+            try:
+                st.write("Making prediction...")
+                results = model(img_tensor)[0]  # Corrected prediction call
+                
+                # Load ground truth mask for comparison (replace with actual loading mechanism)
+                ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results, ground_truth_mask)
+                
+                st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
+                plot_distribution(confidence_scores)
+                
+                if ground_truth_mask is not None:
+                    dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                    st.write(f"Dice Coefficient: {dice:.2f}")
+                    st.write(f"IoU: {iou:.2f}")
+                    st.write(f"Precision: {precision:.2f}")
+                    st.write(f"Recall: {recall:.2f}")
+            except Exception as e:
+                st.error(f"Error during prediction: {e}")
+    except Exception as e:
+        st.error(f"Error downloading sample image: {e}")
 
 def main():
-gif_url = “https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true”
-gif_path = “WholeHeartSegment_ErrorMap_WhiteBg.gif”if not os.path.exists(gif_path):
-    try:
-        st.write("Downloading GIF from URL...")
-        response = requests.get(gif_url)
-        with open(gif_path, 'wb') as f:
-            f.write(response.content)
-        st.write("GIF downloaded successfully.")
-    except Exception as e:
-        st.error(f"Error downloading gif: {e}")
+    gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
+    gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
+    
+    if not os.path.exists(gif_path):
+        try:
+            st.write("Downloading GIF from URL...")
+            response = requests.get(gif_url)
+            with open(gif_path, 'wb') as f:
+                f.write(response.content)
+            st.write("GIF downloaded successfully.")
+        except Exception as e:
+            st.error(f"Error downloading gif: {e}")
 
-if os.path.exists(gif_path):
-    try:
-        st.image(gif_path, width=500)
-    except Exception as e:
-        st.error(f"Error displaying image: {e}")
-else:
-    st.error(f"Error opening '{gif_path}'. File not found.")
+    if os.path.exists(gif_path):
+        try:
+            st.image(gif_path, width=500)
+        except Exception as e:
+            st.error(f"Error displaying image: {e}")
+    else:
+        st.error(f"Error opening '{gif_path}'. File not found.")
 
-st.title("3D MRI Heart Imaging")
-st.subheader("AI driven apps made by Md Abu Sufian")
-st.header("👈🏽 Select the Image Source options")
-st.sidebar.title('⚙️Options')
+    st.title("3D MRI Heart Imaging")
+    st.subheader("AI driven apps made by Md Abu Sufian")
+    st.header("👈🏽 Select the Image Source options")
+    st.sidebar.title('⚙️Options')
 
-src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-model = load_model()
+    model = load_model()
 
-if model is not None:
-    image_input(src, model)
-if name == ‘main’:
-main()
+    if model is not None:
+        image_input(src, model)
+
+if __name__ == '__main__':
+    main()
