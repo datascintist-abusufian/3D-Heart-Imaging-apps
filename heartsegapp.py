@@ -207,5 +207,5 @@ model = load_model()
 
 if model is not None:
     image_input(src, model)
-if name == ‘main’:
+    if name == ‘main’:
 main()
