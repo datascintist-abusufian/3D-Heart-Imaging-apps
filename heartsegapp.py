@@ -15,7 +15,7 @@ MODEL_PATH = "yolov5s.pt"
 GIF_PATH = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
 SAMPLE_IMAGES_DIR = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/tree/main/data/images/test"
 CLASS_NAMES = {0: 'left ventricle', 1: 'right ventricle'}
-THRESHOLD = 0.5  # Confidence threshold for considering a detection as correct
+THRESHOLD = 0.3  # Lowered confidence threshold for considering a detection as correct
 
 @st.cache_resource
 def load_model():
