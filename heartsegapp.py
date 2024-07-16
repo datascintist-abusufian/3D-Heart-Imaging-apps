@@ -165,7 +165,7 @@ def image_input(src, model):
                     plot_distribution(confidence_scores)
                     
                     if ground_truth_mask is not None:
-dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                    dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
 st.write(f”Dice Coefficient: {dice:.2f}”)
 st.write(f”IoU: {iou:.2f}”)
 st.write(f”Precision: {precision:.2f}”)
