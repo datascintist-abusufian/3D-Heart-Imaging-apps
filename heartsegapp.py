@@ -57,7 +57,7 @@ def draw_bboxes_and_masks(image, results):
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
 
     if results.boxes is not None:
-        for box in results.boxes:
+        for i, box in enumerate(results.boxes):
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             conf = box.conf[0]
             cls_id = int(box.cls[0])
@@ -75,12 +75,14 @@ def draw_bboxes_and_masks(image, results):
                 cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
                 # Draw segmentation mask
-                if results.masks is not None:
-                    mask = results.masks[0].cpu().numpy()  # Assuming there's only one mask per box
+                if results.masks is not None and len(results.masks) > i:
+                    mask = results.masks[i].cpu().numpy()  # Get the corresponding mask
                     mask = cv2.resize(mask, (x2 - x1, y2 - y1))
                     mask = (mask > 0.5).astype(np.uint8) * 255
                     roi = img[y1:y2, x1:x2]
                     roi[np.where(mask == 255)] = (0, 255, 0)  # Overlay the mask with green color
+                else:
+                    st.write(f"No mask found for bounding box {i} with confidence {score}")
 
     return img
 
