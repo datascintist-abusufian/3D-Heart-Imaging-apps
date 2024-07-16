@@ -94,7 +94,7 @@ def draw_bboxes_and_masks(image, results):
     return img, confidence_scores
 
 def plot_distribution(confidence_scores):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(5, 3))
     ax.hist(confidence_scores, bins=10, alpha=0.75, color='blue', edgecolor='black')
     ax.set_title('Confidence Score Distribution')
     ax.set_xlabel('Confidence Score')
