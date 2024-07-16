@@ -153,7 +153,7 @@ def image_input(src, model):
 
     elif src == 'From sample Images':
         selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
-        image_name = f"{selected_image}.jpg"image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
+        image_name =f"{selected_image}.jpg"image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
     try:
         st.write("Downloading sample image from URL...")
         response = requests.get(image_url)
