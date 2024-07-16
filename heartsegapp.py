@@ -13,6 +13,22 @@ import matplotlib.pyplot as plt
 # Path to the local model file
 model_path = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 
+
+# --- Configuration ---
+MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
+GIF_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif"
+SAMPLE_IMAGES_DIR = "/Users/mdabusufian/Downloads/3D-Heart-Imaging-apps/data/images/test/"
+LABELS_DIR = SAMPLE_IMAGES_DIR  # Assuming labels are in the same directory
+CLASS_NAMES = {0: 'left ventricle', 1: 'right ventricle'}
+THRESHOLD = 0.5  # Confidence threshold for considering a detection as correct
+
+
+
+
+
+
+
+
 # Ground truth data file path (assuming it's a JSON file)
 ground_truth_path = "annotations.json"
 
