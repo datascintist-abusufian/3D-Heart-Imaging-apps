@@ -142,19 +142,19 @@ def image_input(src, model):
                     st.error(f"Error during prediction: {e}")
 
     elif src == 'From sample Images':
-    selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
-    image_name = f"{selected_image}.jpg"
-    image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
-    try:
-        st.write("Downloading sample image from URL...")
-        response = requests.get(image_url)
-        image = Image.open(BytesIO(response.content)).convert("RGB")
-        st.image(image, caption='Sample Image', use_column_width=False, width=300)
-        img_tensor = process_image(image)
-        if img_tensor is not None:
-            try:
-                st.write("Making prediction...")
-                results = model(img_tensor)[0]  # Corrected prediction call
+        selected_image = st.sidebar.slider("Select random image from test set.", 1, 50)
+        image_name = f"{selected_image}.jpg"
+        image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{image_name}"
+        try:
+            st.write("Downloading sample image from URL...")
+            response = requests.get(image_url)
+            image = Image.open(BytesIO(response.content)).convert("RGB")
+            st.image(image, caption='Sample Image', use_column_width=False, width=300)
+            img_tensor = process_image(image)
+            if img_tensor is not None:
+                try:
+                    st.write("Making prediction...")
+                    results = model(img_tensor)[0]  # Corrected prediction call
                 
                 # Load ground truth mask for comparison (replace with actual loading mechanism)
                 ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
