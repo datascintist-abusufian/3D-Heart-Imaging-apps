@@ -8,6 +8,7 @@ from io import BytesIO
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from sklearn.metrics import jaccard_score, precision_score, recall_score
 
 # --- Configuration ---
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"  # Ensure correct URL
@@ -52,13 +53,15 @@ def process_image(image):
         st.error(f"Error processing image: {e}")
         return None
 
-def draw_bboxes_and_masks(image, results):
+def draw_bboxes_and_masks(image, results, ground_truth_mask=None):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
     confidence_scores = []
 
     st.write(f"Number of bounding boxes: {len(results.boxes) if results.boxes is not None else 0}")
     st.write(f"Number of masks: {len(results.masks) if results.masks is not None else 0}")
+
+    pred_mask = np.zeros(img.shape[:2], dtype=np.uint8)
 
     if results.boxes is not None:
         for i, box in enumerate(results.boxes):
@@ -86,12 +89,14 @@ def draw_bboxes_and_masks(image, results):
                     st.write(f"Mask shape for bounding box {i}: {mask.shape}")
                     mask = cv2.resize(mask, (x2 - x1, y2 - y1))
                     mask = (mask > 0.5).astype(np.uint8) * 255
+                    pred_mask[y1:y2, x1:x2] = mask
                     roi = img[y1:y2, x1:x2]
                     roi[np.where(mask == 255)] = (0, 255, 0)  # Overlay the mask with green color
                 else:
                     st.write(f"No mask found for bounding box {i} with confidence {score}")
 
-    return img, confidence_scores
+    return img, confidence_scores, pred_mask
+
 def calculate_metrics(true_mask, pred_mask):
     dice = 2 * np.sum(pred_mask[true_mask == 1]) / (np.sum(pred_mask) + np.sum(true_mask))
     iou = jaccard_score(true_mask.flatten(), pred_mask.flatten(), average='binary')
@@ -100,7 +105,7 @@ def calculate_metrics(true_mask, pred_mask):
     return dice, iou, precision, recall
 
 def plot_distribution(confidence_scores):
-    fig, ax = plt.subplots(figsize=(4, 3))
+    fig, ax = plt.subplots(figsize=(5, 3))  # Set figure size here
     ax.hist(confidence_scores, bins=10, alpha=0.75, color='blue', edgecolor='black')
     ax.set_title('Confidence Score Distribution')
     ax.set_xlabel('Confidence Score')
@@ -119,9 +124,20 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes, confidence_scores = draw_bboxes_and_masks(img, results)
+                    
+                    # Load ground truth mask for comparison (replace with actual loading mechanism)
+                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                    img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(img, results, ground_truth_mask)
+                    
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                     plot_distribution(confidence_scores)
+                    
+                    if ground_truth_mask is not None:
+                        dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                        st.write(f"Dice Coefficient: {dice:.2f}")
+                        st.write(f"IoU: {iou:.2f}")
+                        st.write(f"Precision: {precision:.2f}")
+                        st.write(f"Recall: {recall:.2f}")
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
 
@@ -139,47 +155,55 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes, confidence_scores = draw_bboxes_and_masks(image, results)
+                    
+                    # Load ground truth mask for comparison (replace with actual loading mechanism)
+                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                    img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results, ground_truth_mask)
+                    
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
                     plot_distribution(confidence_scores)
-                except Exception as e:
-                    st.error(f"Error during prediction: {e}")
-        except Exception as e:
-            st.error(f"Error downloading sample image: {e}")
+                    
+                    if ground_truth_mask is not None:
+                        dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                        st.write(f"Dice Coefficient: {dice:.2f}")
+                        st.write(f"IoU: {iou:.2f}")
+                        st.write(f"Precision: {precision:.2f}”)
+st.write(f”Recall: {recall:.2f}”)
+except Exception as e:
+st.error(f”Error during prediction: {e}”)
+except Exception as e:
+st.error(f”Error downloading sample image: {e}”)
 
 def main():
-    gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
-    gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
-    
-    if not os.path.exists(gif_path):
-        try:
-            st.write("Downloading GIF from URL...")
-            response = requests.get(gif_url)
-            with open(gif_path, 'wb') as f:
-                f.write(response.content)
-            st.write("GIF downloaded successfully.")
-        except Exception as e:
-            st.error(f"Error downloading gif: {e}")
+gif_url = “https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true”
+gif_path = “WholeHeartSegment_ErrorMap_WhiteBg.gif”if not os.path.exists(gif_path):
+    try:
+        st.write("Downloading GIF from URL...")
+        response = requests.get(gif_url)
+        with open(gif_path, 'wb') as f:
+            f.write(response.content)
+        st.write("GIF downloaded successfully.")
+    except Exception as e:
+        st.error(f"Error downloading gif: {e}")
 
-    if os.path.exists(gif_path):
-        try:
-            st.image(gif_path, width=500)
-        except Exception as e:
-            st.error(f"Error displaying image: {e}")
-    else:
-        st.error(f"Error opening '{gif_path}'. File not found.")
+if os.path.exists(gif_path):
+    try:
+        st.image(gif_path, width=500)
+    except Exception as e:
+        st.error(f"Error displaying image: {e}")
+else:
+    st.error(f"Error opening '{gif_path}'. File not found.")
 
-    st.title("3D Heart MRI Image Segmentation")
-    st.subheader("AI driven apps made by Md Abu Sufian")
-    st.header("👈🏽 Select the Image Source options")
-    st.sidebar.title('⚙️Options')
+st.title("3D MRI Heart Imaging")
+st.subheader("AI driven apps made by Md Abu Sufian")
+st.header("👈🏽 Select the Image Source options")
+st.sidebar.title('⚙️Options')
 
-    src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
+src = st.sidebar.radio("Select input source.", ['From sample Images', 'Upload your own Image'])
 
-    model = load_model()
+model = load_model()
 
-    if model is not None:
-        image_input(src, model)
-
-if __name__ == '__main__':
-    main()
+if model is not None:
+    image_input(src, model)
+if name == ‘main’:
+main()
