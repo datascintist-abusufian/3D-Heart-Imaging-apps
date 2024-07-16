@@ -178,6 +178,7 @@ def image_input(src, model):
 def main():
     gif_url = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif?raw=true"
     gif_path = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
+    
 if not os.path.exists(gif_path):
     try:
         st.write("Downloading GIF from URL...")
