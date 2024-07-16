@@ -55,6 +55,7 @@ def process_image(image):
 def draw_bboxes_and_masks(image, results):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
+    confidence_scores = []
 
     st.write(f"Number of bounding boxes: {len(results.boxes) if results.boxes is not None else 0}")
     st.write(f"Number of masks: {len(results.masks) if results.masks is not None else 0}")
@@ -66,6 +67,8 @@ def draw_bboxes_and_masks(image, results):
             cls_id = int(box.cls[0])
             label = class_names.get(cls_id, 'Unknown')
             score = conf
+
+            confidence_scores.append(score)
 
             if score > THRESHOLD:  # Ensure threshold consistency
                 cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
@@ -88,7 +91,15 @@ def draw_bboxes_and_masks(image, results):
                 else:
                     st.write(f"No mask found for bounding box {i} with confidence {score}")
 
-    return img
+    return img, confidence_scores
+
+def plot_distribution(confidence_scores):
+    fig, ax = plt.subplots()
+    ax.hist(confidence_scores, bins=10, alpha=0.75, color='blue', edgecolor='black')
+    ax.set_title('Confidence Score Distribution')
+    ax.set_xlabel('Confidence Score')
+    ax.set_ylabel('Frequency')
+    st.pyplot(fig)
 
 def image_input(src, model):
     if src == 'Upload your own Image':
@@ -102,8 +113,9 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes = draw_bboxes_and_masks(img, results)
+                    img_with_bboxes, confidence_scores = draw_bboxes_and_masks(img, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
+                    plot_distribution(confidence_scores)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
 
@@ -121,8 +133,9 @@ def image_input(src, model):
                 try:
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
-                    img_with_bboxes = draw_bboxes_and_masks(image, results)
+                    img_with_bboxes, confidence_scores = draw_bboxes_and_masks(image, results)
                     st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
+                    plot_distribution(confidence_scores)
                 except Exception as e:
                     st.error(f"Error during prediction: {e}")
         except Exception as e:
