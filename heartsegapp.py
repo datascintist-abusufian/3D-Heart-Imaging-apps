@@ -10,7 +10,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 # --- Configuration ---
-MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"  # Replace with the path to your trained model weights
+MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/train.py"  # Replace with the path to your trained model weights
 GIF_PATH = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
 SAMPLE_IMAGES_DIR = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/tree/main/data/images/test"
 LABELS_DIR = SAMPLE_IMAGES_DIR  # Assuming labels are in the same directory
