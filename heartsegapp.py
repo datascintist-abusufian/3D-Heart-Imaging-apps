@@ -166,8 +166,7 @@ def image_input(src, model):
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
                     
-                    #Load ground truth mask for comparison (replace with actual loading mechanism)
-ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                    #Load ground truth mask for comparison (replace with actual loading mechanism)ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
 img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results, ground_truth_mask)
 
                 st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
