@@ -92,6 +92,12 @@ def draw_bboxes_and_masks(image, results):
                     st.write(f"No mask found for bounding box {i} with confidence {score}")
 
     return img, confidence_scores
+def calculate_metrics(true_mask, pred_mask):
+    dice = 2 * np.sum(pred_mask[true_mask == 1]) / (np.sum(pred_mask) + np.sum(true_mask))
+    iou = jaccard_score(true_mask.flatten(), pred_mask.flatten(), average='binary')
+    precision = precision_score(true_mask.flatten(), pred_mask.flatten(), average='binary')
+    recall = recall_score(true_mask.flatten(), pred_mask.flatten(), average='binary')
+    return dice, iou, precision, recall
 
 def plot_distribution(confidence_scores):
     fig, ax = plt.subplots(figsize=(4, 3))
