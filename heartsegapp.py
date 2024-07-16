@@ -9,7 +9,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-
 # --- Configuration ---
 MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
 GIF_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif"
@@ -56,20 +55,23 @@ def process_image(image):
 def draw_bboxes(image, results):
     img = np.array(image)
     class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
-    
-    for result in results.xyxy[0]:
-        x1, y1, x2, y2, conf, cls_id = result.int().tolist()
-        label = class_names.get(cls_id, 'Unknown')
-        score = conf
 
-        cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        text = f"{label} {score:.2f}"
-        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-        text_x = x1
-        text_y = y1 - 10 if y1 - 10 > 10 else y1 + 10
+    if results.boxes is not None:
+        for box in results.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = box.conf[0]
+            cls_id = int(box.cls[0])
+            label = class_names.get(cls_id, 'Unknown')
+            score = conf
 
-        cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
-        cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            text = f"{label} {score:.2f}"
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+            text_x = x1
+            text_y = y1 - 10 if y1 - 10 > 10 else y1 + 10
+
+            cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
+            cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     
     return img
 
