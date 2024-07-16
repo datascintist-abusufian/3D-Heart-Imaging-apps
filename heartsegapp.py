@@ -10,8 +10,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 # --- Configuration ---
-MODEL_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/yolov5s.pt"
-GIF_PATH = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/blob/main/WholeHeartSegment_ErrorMap_WhiteBg.gif"
+MODEL_PATH = "path_to_your_trained_model_weights.pt"  # Replace with the path to your trained model weights
+GIF_PATH = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
 SAMPLE_IMAGES_DIR = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/tree/main/data/images/test"
 LABELS_DIR = SAMPLE_IMAGES_DIR  # Assuming labels are in the same directory
 CLASS_NAMES = {0: 'left ventricle', 1: 'right ventricle'}
@@ -19,14 +19,11 @@ THRESHOLD = 0.5  # Confidence threshold for considering a detection as correct
 
 @st.cache_resource
 def load_model():
-    model_file = "yolov5s.pt"
+    model_file = MODEL_PATH
     if not os.path.exists(model_file):
-        st.write("Downloading model...")
-        response = requests.get(MODEL_PATH)
-        with open(model_file, 'wb') as f:
-            f.write(response.content)
-        st.write("Model downloaded successfully.")
-    
+        st.error(f"Model file not found at {model_file}")
+        return None
+
     try:
         st.write("Loading model from path...")
         model = YOLO(model_file)  # Load YOLOv5 model
@@ -40,8 +37,8 @@ def load_model():
 def process_image(image):
     st.write("Processing image...")
     transform = transforms.Compose([
-        transforms.Resize((640, 640)),  # Adjust to the input size your model expects
-        transforms.ToTensor(),
+        transforms.Resize((640, 640)),  # Ensure this matches your training configuration
+        transforms.ToTensor(),          # Ensure this matches your training configuration
     ])
 
     try:
@@ -64,14 +61,15 @@ def draw_bboxes(image, results):
             label = class_names.get(cls_id, 'Unknown')
             score = conf
 
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-            text = f"{label} {score:.2f}"
-            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-            text_x = x1
-            text_y = y1 - 10 if y1 - 10 > 10 else y1 + 10
+            if score > THRESHOLD:  # Ensure threshold consistency
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                text = f"{label} {score:.2f}"
+                text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                text_x = x1
+                text_y = y1 - 10 if y1 - 10 > 10 else y1 + 10
 
-            cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
-            cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                cv2.rectangle(img, (text_x, text_y - text_size[1] - 5), (text_x + text_size[0], text_y + 5), (255, 0, 0), -1)
+                cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     
     return img
 
