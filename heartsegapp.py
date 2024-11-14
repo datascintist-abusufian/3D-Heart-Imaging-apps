@@ -10,16 +10,15 @@ import cv2
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
-from sklearn.metrics import jaccard_score, precision_score, recall_score
+from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
 import time
 
-# --- Constants ---
+# --- Constants and Configuration ---
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
 MODEL_PATH = "yolov5s.pt"
 CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
 THRESHOLD = 0.3
 
-# --- Page Configuration ---
 st.set_page_config(
     page_title="3D Heart MRI Analysis",
     page_icon="🫀",
@@ -30,9 +29,7 @@ st.set_page_config(
 # --- Custom CSS ---
 st.markdown("""
     <style>
-    .main {
-        padding: 2rem;
-    }
+    .main { padding: 2rem; }
     .metric-card {
         background-color: #f0f2f6;
         border-radius: 10px;
@@ -55,31 +52,23 @@ st.markdown("""
 def load_model():
     """Load the YOLO model with proper error handling"""
     try:
-        # Create a models directory if it doesn't exist
         os.makedirs('models', exist_ok=True)
         model_path = os.path.join('models', MODEL_PATH)
 
-        # Download the model if it doesn't exist
         if not os.path.exists(model_path):
             with st.spinner("📥 Downloading model..."):
                 response = requests.get(MODEL_URL, stream=True)
-                response.raise_for_status()  # Raise an error for bad responses
-                
-                # Save the model file
+                response.raise_for_status()
                 with open(model_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
                 st.success("✅ Model downloaded successfully!")
 
-        # Load the model
         with st.spinner("🔄 Loading model..."):
             model = YOLO(model_path)
             st.success("✅ Model loaded successfully!")
             return model
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Error downloading model: {str(e)}")
-        return None
     except Exception as e:
         st.error(f"❌ Error loading model: {str(e)}")
         return None
@@ -96,37 +85,156 @@ def process_image(image):
         st.error(f"❌ Error processing image: {str(e)}")
         return None
 
-def draw_bboxes_and_masks(image, results):
-    """Draw bounding boxes and masks on the image"""
-    img = np.array(image)
-    confidence_scores = []
-    pred_mask = np.zeros((640, 640), dtype=np.uint8)
+def create_3d_surface_plot(mask):
+    """Create 3D surface plot of segmentation mask"""
+    x, y = np.meshgrid(
+        np.linspace(0, mask.shape[1], mask.shape[1]),
+        np.linspace(0, mask.shape[0], mask.shape[0])
+    )
+    
+    fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y)])
+    fig.update_layout(
+        title='3D Surface Plot of Segmentation Mask',
+        scene=dict(
+            xaxis_title='Width',
+            yaxis_title='Height',
+            zaxis_title='Intensity'
+        ),
+        width=600,
+        height=500
+    )
+    return fig
 
+def create_confidence_plot(confidence_scores):
+    """Create confidence distribution plot"""
+    if not confidence_scores:
+        return None
+    
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=confidence_scores,
+        nbinsx=20,
+        name='Confidence Distribution',
+        marker_color='#00a6ed'
+    ))
+    fig.update_layout(
+        title='Detection Confidence Distribution',
+        xaxis_title='Confidence Score',
+        yaxis_title='Frequency',
+        showlegend=False,
+        width=600,
+        height=400
+    )
+    return fig
+
+def calculate_metrics(true_mask, pred_mask):
+    """Calculate evaluation metrics"""
     try:
-        if results.boxes is not None:
-            for i, box in enumerate(results.boxes):
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = float(box.conf[0])
-                cls_id = int(box.cls[0])
-                label = CLASS_NAMES.get(cls_id, 'Unknown')
-                
-                confidence_scores.append(conf)
-                
-                if conf > THRESHOLD:
-                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                    text = f"{label} {conf:.2f}"
-                    cv2.putText(img, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
-
-                    if results.masks is not None and i < len(results.masks):
-                        mask = results.masks[i].data.cpu().numpy()[0]
-                        mask_resized = cv2.resize(mask, (x2 - x1, y2 - y1))
-                        mask_resized = (mask_resized > 0.5).astype(np.uint8) * 255
-                        pred_mask[y1:y2, x1:x2] = mask_resized
-
-        return img, confidence_scores, pred_mask
+        true_mask = cv2.resize(true_mask, (640, 640))
+        pred_mask_binary = (pred_mask > 0).astype(np.uint8)
+        true_mask_binary = (true_mask > 0).astype(np.uint8)
+        
+        intersection = np.logical_and(true_mask_binary, pred_mask_binary)
+        union = np.logical_or(true_mask_binary, pred_mask_binary)
+        
+        dice = 2 * np.sum(intersection) / (np.sum(pred_mask_binary) + np.sum(true_mask_binary) + 1e-6)
+        iou = np.sum(intersection) / (np.sum(union) + 1e-6)
+        
+        precision = precision_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+        recall = recall_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+        f1 = f1_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+        
+        return dice, iou, precision, recall, f1
     except Exception as e:
-        st.error(f"❌ Error processing detection results: {str(e)}")
-        return img, [], pred_mask
+        st.error(f"❌ Error calculating metrics: {str(e)}")
+        return 0, 0, 0, 0, 0
+
+def create_metrics_dashboard(metrics):
+    """Create metrics dashboard with styled cards"""
+    cols = st.columns(5)
+    
+    metric_styles = {
+        'Dice Score': ('🎯', '#FF6B6B'),
+        'IoU': ('🔄', '#4ECDC4'),
+        'Precision': ('📊', '#45B7D1'),
+        'Recall': ('📈', '#96CEB4'),
+        'F1 Score': ('⭐', '#FFEEAD')
+    }
+    
+    for (metric_name, value), col in zip(metrics.items(), cols):
+        icon, color = metric_styles[metric_name]
+        with col:
+            st.markdown(f"""
+            <div style='
+                background-color: {color}22;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+                border: 2px solid {color};
+            '>
+                <h3 style='margin: 0; color: #31333F;'>{icon} {metric_name}</h3>
+                <p style='font-size: 24px; margin: 10px 0; color: {color};'>{value:.3f}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+def process_and_visualize(image, model):
+    """Process image and create visualizations"""
+    with st.spinner("🔄 Processing image..."):
+        # Create tabs for different visualizations
+        tab1, tab2, tab3 = st.tabs(["📊 Analysis", "🎯 Segmentation", "📈 3D View"])
+        
+        # Process image
+        img_tensor = process_image(image)
+        if img_tensor is None:
+            return
+        
+        # Run inference
+        try:
+            results = model(img_tensor)[0]
+            img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results)
+            
+            with tab1:
+                st.subheader("Analysis Results")
+                if np.any(pred_mask):
+                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
+                    dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
+                    
+                    metrics = {
+                        'Dice Score': dice,
+                        'IoU': iou,
+                        'Precision': precision,
+                        'Recall': recall,
+                        'F1 Score': f1
+                    }
+                    create_metrics_dashboard(metrics)
+                    
+                    conf_fig = create_confidence_plot(confidence_scores)
+                    if conf_fig:
+                        st.plotly_chart(conf_fig, use_container_width=True)
+                else:
+                    st.warning("⚠️ No detections found in the image")
+            
+            with tab2:
+                st.subheader("Segmentation Results")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
+                with col2:
+                    mask_overlay = np.zeros_like(img_with_bboxes)
+                    mask_overlay[pred_mask == 255] = (0, 255, 0)
+                    combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
+                    st.image(combined_img, caption='Segmentation Overlay', use_column_width=True)
+            
+            with tab3:
+                st.subheader("3D Visualization")
+                if np.any(pred_mask):
+                    surface_plot = create_3d_surface_plot(pred_mask)
+                    st.plotly_chart(surface_plot, use_container_width=True)
+                else:
+                    st.warning("⚠️ No mask data available for 3D visualization")
+                    
+        except Exception as e:
+            st.error(f"❌ Error during processing: {str(e)}")
 
 def main():
     # Sidebar
@@ -134,7 +242,6 @@ def main():
         st.title("🎛️ Control Panel")
         st.markdown("---")
         
-        # Image source selection
         src = st.radio(
             "📷 Select Image Source",
             ['Sample Gallery', 'Upload Image'],
@@ -156,13 +263,11 @@ def main():
     deep learning for segmentation and detection of cardiac structures.
     """)
     
-    # Load model with proper error handling
     model = load_model()
     if model is None:
-        st.warning("⚠️ Please make sure you have a stable internet connection and try reloading the page.")
+        st.warning("⚠️ Please ensure you have a stable internet connection and try reloading the page.")
         return
 
-    # Image processing
     if src == 'Upload Image':
         uploaded_file = st.file_uploader(
             "Choose an image...",
@@ -178,7 +283,6 @@ def main():
                     process_and_visualize(image, model)
             except Exception as e:
                 st.error(f"❌ Error loading uploaded image: {str(e)}")
-    
     else:
         try:
             selected_image = st.slider(
