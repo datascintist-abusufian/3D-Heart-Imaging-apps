@@ -8,7 +8,7 @@ from io import BytesIO
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from sklearn.metrics import jaccard_score, precision_score, recall_score
+from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
 
 # --- Configuration ---
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
@@ -55,7 +55,6 @@ def process_image(image):
 
 def draw_bboxes_and_masks(image, results, ground_truth_mask=None):
     img = np.array(image)
-    class_names = {0: 'left ventricle', 1: 'right ventricle'}  # Assuming these are your class indices
     confidence_scores = []
 
     st.write(f"Number of bounding boxes: {len(results.boxes) if results.boxes is not None else 0}")
@@ -68,7 +67,7 @@ def draw_bboxes_and_masks(image, results, ground_truth_mask=None):
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             conf = box.conf[0]
             cls_id = int(box.cls[0])
-            label = class_names.get(cls_id, 'Unknown')
+            label = CLASS_NAMES.get(cls_id, 'Unknown')
             score = conf
 
             confidence_scores.append(score)
@@ -100,7 +99,6 @@ def draw_bboxes_and_masks(image, results, ground_truth_mask=None):
 def calculate_metrics(true_mask, pred_mask):
     true_mask_resized = cv2.resize(true_mask, (640, 640))  # Resize ground truth mask to match the predicted mask
     
-    # Debug statements to check mask contents
     st.write(f"True mask unique values: {np.unique(true_mask_resized)}")
     st.write(f"Predicted mask unique values: {np.unique(pred_mask)}")
     
@@ -111,16 +109,35 @@ def calculate_metrics(true_mask, pred_mask):
     
     precision = precision_score(true_mask_resized.flatten(), pred_mask.flatten(), average='binary')
     recall = recall_score(true_mask_resized.flatten(), pred_mask.flatten(), average='binary')
+    f1 = f1_score(true_mask_resized.flatten(), pred_mask.flatten(), average='binary')
     
-    return dice, iou, precision, recall
+    return dice, iou, precision, recall, f1
 
 def plot_distribution(confidence_scores):
-    fig, ax = plt.subplots(figsize=(5, 3))  # Set figure size here
+    fig, ax = plt.subplots(figsize=(5, 3))
     ax.hist(confidence_scores, bins=10, alpha=0.75, color='blue', edgecolor='black')
     ax.set_title('Confidence Score Distribution')
     ax.set_xlabel('Confidence Score')
     ax.set_ylabel('Frequency')
     st.pyplot(fig)
+
+def show_advanced_visualizations(img_with_bboxes, pred_mask, confidence_scores):
+    st.header("Advanced Visualizations")
+
+    # Display bounding box and segmentation overlays
+    st.subheader("Bounding Boxes and Masks")
+    st.image(img_with_bboxes, caption="Image with Bounding Boxes and Masks")
+
+    # Display segmentation mask overlay
+    st.subheader("Segmentation Mask Overlay")
+    mask_overlay = np.zeros_like(img_with_bboxes)
+    mask_overlay[pred_mask == 255] = (0, 255, 0)
+    combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
+    st.image(combined_img, caption="Overlay of Segmentation Mask on Image")
+
+    # Plot confidence score distribution
+    st.subheader("Confidence Score Distribution")
+    plot_distribution(confidence_scores)
 
 def image_input(src, model):
     if src == 'Upload your own Image':
@@ -135,19 +152,18 @@ def image_input(src, model):
                     st.write("Making prediction...")
                     results = model(img_tensor)[0]  # Corrected prediction call
 
-                    # Load ground truth mask for comparison (replace with actual loading mechanism)
-                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
                     img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(img, results, ground_truth_mask)
 
-                    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
-                    plot_distribution(confidence_scores)
+                    show_advanced_visualizations(img_with_bboxes, pred_mask, confidence_scores)
 
                     if np.any(pred_mask):  # Only calculate metrics if there is a predicted mask
-                        dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                        dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
                         st.write(f"Dice Coefficient: {dice:.2f}")
                         st.write(f"IoU: {iou:.2f}")
                         st.write(f"Precision: {precision:.2f}")
                         st.write(f"Recall: {recall:.2f}")
+                        st.write(f"F1 Score: {f1:.2f}")
                     else:
                         st.write("No masks found in the prediction.")
                 except Exception as e:
@@ -166,21 +182,20 @@ def image_input(src, model):
             if img_tensor is not None:
                 try:
                     st.write("Making prediction...")
-                    results = model(img_tensor)[0]  # Corrected prediction call
+                    results = model(img_tensor)[0]
 
-                    # Load ground truth mask for comparison (replace with actual loading mechanism)
-                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)  # Replace with actual ground truth mask
+                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
                     img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results, ground_truth_mask)
 
-                    st.image(img_with_bboxes, caption='Predicted Heart Segmentation', use_column_width=False, width=300)
-                    plot_distribution(confidence_scores)
+                    show_advanced_visualizations(img_with_bboxes, pred_mask, confidence_scores)
 
-                    if np.any(pred_mask):  # Only calculate metrics if there is a predicted mask
-                        dice, iou, precision, recall = calculate_metrics(ground_truth_mask, pred_mask)
+                    if np.any(pred_mask):
+                        dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
                         st.write(f"Dice Coefficient: {dice:.2f}")
                         st.write(f"IoU: {iou:.2f}")
                         st.write(f"Precision: {precision:.2f}")
                         st.write(f"Recall: {recall:.2f}")
+                        st.write(f"F1 Score: {f1:.2f}")
                     else:
                         st.write("No masks found in the prediction.")
                 except Exception as e:
