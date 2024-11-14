@@ -1,17 +1,14 @@
 import streamlit as st
+import torch
 from ultralytics import YOLO
 from PIL import Image
-import os
 import requests
 from torchvision.transforms import transforms
 from io import BytesIO
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
 import plotly.graph_objects as go
-import plotly.express as px
+from sklearn.metrics import precision_score, recall_score, f1_score
 import time
 
 # --- Configuration ---
@@ -19,8 +16,6 @@ st.set_page_config(page_title="3D Heart MRI Analysis", layout="wide", initial_si
 
 # Constants
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
-MODEL_PATH = "yolov5s.pt"
-GIF_PATH = "WholeHeartSegment_ErrorMap_WhiteBg.gif"
 CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
 THRESHOLD = 0.3
 
@@ -43,23 +38,24 @@ st.markdown("""
     .stProgress > div > div > div {
         background-color: #00a6ed;
     }
+    [data-testid="stSidebarNav"] {
+        background-image: url('https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/logo.png');
+        background-repeat: no-repeat;
+        padding-top: 120px;
+        background-position: 20px 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
 def load_model():
     with st.spinner("Loading model... Please wait."):
-        model_file = MODEL_PATH
-        if not os.path.exists(model_file):
-            with st.status("Downloading model...") as status:
-                response = requests.get(MODEL_URL)
-                with open(model_file, 'wb') as f:
-                    f.write(response.content)
-                status.update(label="Model downloaded successfully!", state="complete")
-        
         try:
-            model = YOLO(model_file)
-            return model
+            if 'model' not in st.session_state:
+                response = requests.get(MODEL_URL)
+                model_path = BytesIO(response.content)
+                st.session_state.model = YOLO(model_path)
+            return st.session_state.model
         except Exception as e:
             st.error(f"Error loading model: {e}")
             return None
@@ -75,35 +71,79 @@ def process_image(image):
         st.error(f"Error processing image: {e}")
         return None
 
+def draw_bboxes_and_masks(image, results):
+    img = np.array(image)
+    confidence_scores = []
+    pred_mask = np.zeros((640, 640), dtype=np.uint8)
+
+    if results.boxes is not None:
+        for i, box in enumerate(results.boxes):
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = float(box.conf[0])
+            cls_id = int(box.cls[0])
+            label = CLASS_NAMES.get(cls_id, 'Unknown')
+            
+            confidence_scores.append(conf)
+            
+            if conf > THRESHOLD:
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                text = f"{label} {conf:.2f}"
+                cv2.putText(img, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+
+                if results.masks is not None and i < len(results.masks):
+                    mask = results.masks[i].data.cpu().numpy()[0]
+                    mask_resized = cv2.resize(mask, (x2 - x1, y2 - y1))
+                    mask_resized = (mask_resized > 0.5).astype(np.uint8) * 255
+                    pred_mask[y1:y2, x1:x2] = mask_resized
+
+    return img, confidence_scores, pred_mask
+
+def calculate_metrics(true_mask, pred_mask):
+    true_mask = cv2.resize(true_mask, (640, 640))
+    pred_mask_binary = (pred_mask > 0).astype(np.uint8)
+    true_mask_binary = (true_mask > 0).astype(np.uint8)
+    
+    intersection = np.logical_and(true_mask_binary, pred_mask_binary)
+    union = np.logical_or(true_mask_binary, pred_mask_binary)
+    
+    dice = 2 * np.sum(intersection) / (np.sum(pred_mask_binary) + np.sum(true_mask_binary) + 1e-6)
+    iou = np.sum(intersection) / (np.sum(union) + 1e-6)
+    
+    precision = precision_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+    recall = recall_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+    f1 = f1_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+    
+    return dice, iou, precision, recall, f1
+
 def create_analysis_metrics(dice, iou, precision, recall, f1):
-    col1, col2, col3, col4, col5 = st.columns(5)
+    cols = st.columns(5)
     
-    with col1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Dice Score", f"{dice:.3f}")
-        st.markdown('</div>', unsafe_allow_html=True)
+    metrics = [
+        ("Dice Score", dice),
+        ("IoU Score", iou),
+        ("Precision", precision),
+        ("Recall", recall),
+        ("F1 Score", f1)
+    ]
     
-    with col2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("IoU Score", f"{iou:.3f}")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Precision", f"{precision:.3f}")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Recall", f"{recall:.3f}")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("F1 Score", f"{f1:.3f}")
-        st.markdown('</div>', unsafe_allow_html=True)
+    for col, (metric_name, value) in zip(cols, metrics):
+        with col:
+            st.markdown(f"""
+            <div style='
+                background-color: #f0f2f6;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+            '>
+                <h3 style='margin: 0; color: #31333F;'>{metric_name}</h3>
+                <p style='font-size: 24px; margin: 10px 0; color: #00a6ed;'>{value:.3f}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 def plot_confidence_distribution(confidence_scores):
+    if not confidence_scores:
+        return None
+        
     fig = go.Figure()
     fig.add_trace(go.Histogram(
         x=confidence_scores,
@@ -151,7 +191,6 @@ def process_and_analyze(image, model):
         results = model(img_tensor)[0]
         img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results)
         
-        # Create tabs for different visualizations
         tab1, tab2, tab3 = st.tabs(["📊 Analysis", "🎯 Detections", "📈 3D View"])
         
         with tab1:
@@ -161,7 +200,8 @@ def process_and_analyze(image, model):
                 create_analysis_metrics(dice, iou, precision, recall, f1)
                 
                 conf_fig = plot_confidence_distribution(confidence_scores)
-                st.plotly_chart(conf_fig, use_container_width=True)
+                if conf_fig:
+                    st.plotly_chart(conf_fig, use_container_width=True)
             else:
                 st.warning("No masks detected in the image.")
         
@@ -176,8 +216,11 @@ def process_and_analyze(image, model):
                 st.image(combined_img, caption='Segmentation Overlay', use_column_width=True)
         
         with tab3:
-            visualization_3d = create_3d_visualization(pred_mask)
-            st.plotly_chart(visualization_3d, use_container_width=True)
+            if np.any(pred_mask):
+                visualization_3d = create_3d_visualization(pred_mask)
+                st.plotly_chart(visualization_3d, use_container_width=True)
+            else:
+                st.warning("No mask data available for 3D visualization.")
 
 def main():
     # Sidebar
@@ -187,8 +230,14 @@ def main():
     # Main content
     st.title("🫀 3D MRI Heart Analysis Dashboard")
     st.markdown("""
-    This advanced dashboard provides comprehensive analysis of heart MRI images using 
-    deep learning for segmentation and detection of cardiac structures.
+    This advanced dashboard analyzes heart MRI images using deep learning for cardiac structure segmentation and detection.
+    
+    ### Features:
+    - Real-time heart structure detection
+    - Segmentation mask generation
+    - 3D visualization
+    - Confidence analysis
+    - Performance metrics
     """)
     
     # Load model
@@ -214,7 +263,7 @@ def main():
             image = Image.open(uploaded_file).convert("RGB")
             st.image(image, caption='Uploaded Image', use_column_width=False, width=300)
             
-            if st.button("🔍 Analyze Image"):
+            if st.button("🔍 Analyze Image", type="primary"):
                 process_and_analyze(image, model)
     
     else:
@@ -231,7 +280,7 @@ def main():
             image = Image.open(BytesIO(response.content)).convert("RGB")
             st.image(image, caption=f'Sample Image #{selected_image}', use_column_width=False, width=300)
             
-            if st.button("🔍 Analyze Image"):
+            if st.button("🔍 Analyze Image", type="primary"):
                 process_and_analyze(image, model)
                 
         except Exception as e:
@@ -240,10 +289,16 @@ def main():
     # Footer
     st.sidebar.markdown('---')
     st.sidebar.markdown("""
-    💡 **About**
-    - Built with Streamlit & YOLOv5
-    - Made by Md Abu Sufian
-    - For research purposes only
+    ### 💡 About
+    This dashboard is designed for research purposes in cardiac MRI analysis.
+    
+    **Technologies:**
+    - YOLOv5 for detection
+    - Streamlit for interface
+    - Deep learning for segmentation
+    
+    **Created by:** Md Abu Sufian  
+    **Version:** 2.0.0
     """)
 
 if __name__ == '__main__':
