@@ -251,7 +251,7 @@ def main():
         st.markdown("---")
         st.markdown("""
         ### 📋 Information
-        - Model: YOLOv5
+        - Model: Deep Learning AI
         - Classes: Left & Right Ventricle
         - Resolution: 640x640
         """)
