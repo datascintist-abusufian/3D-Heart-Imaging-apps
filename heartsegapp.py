@@ -1,4 +1,5 @@
 import streamlit as st
+import torch
 from ultralytics import YOLO
 from PIL import Image
 import os
@@ -10,8 +11,11 @@ import cv2
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
+import seaborn as sns
 from sklearn.metrics import jaccard_score, precision_score, recall_score, f1_score
 import time
+import pandas as pd
+from datetime import datetime
 
 # --- Constants and Configuration ---
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
@@ -19,6 +23,7 @@ MODEL_PATH = "yolov5s.pt"
 CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
 THRESHOLD = 0.3
 
+# Page configuration
 st.set_page_config(
     page_title="3D Heart MRI Analysis",
     page_icon="🫀",
@@ -26,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS ---
+# Custom CSS
 st.markdown("""
     <style>
     .main { padding: 2rem; }
@@ -43,6 +48,23 @@ st.markdown("""
         color: white;
         border-radius: 5px;
         padding: 0.5rem 1rem;
+        margin: 1rem 0;
+    }
+    .analysis-header {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin: 1rem 0;
+        color: #31333F;
+    }
+    .analysis-subheader {
+        font-size: 1.2rem;
+        color: #31333F;
+        margin: 0.5rem 0;
+    }
+    .result-container {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
         margin: 1rem 0;
     }
     </style>
@@ -85,120 +107,237 @@ def process_image(image):
         st.error(f"❌ Error processing image: {str(e)}")
         return None
 
-def create_3d_surface_plot(mask):
-    """Create 3D surface plot of segmentation mask"""
-    x, y = np.meshgrid(
-        np.linspace(0, mask.shape[1], mask.shape[1]),
-        np.linspace(0, mask.shape[0], mask.shape[0])
-    )
-    
-    fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y)])
-    fig.update_layout(
-        title='3D Surface Plot of Segmentation Mask',
-        scene=dict(
-            xaxis_title='Width',
-            yaxis_title='Height',
-            zaxis_title='Intensity'
-        ),
-        width=600,
-        height=500
-    )
-    return fig
+def draw_bboxes_and_masks(image, results):
+    """Draw bounding boxes and masks on the image"""
+    try:
+        img = np.array(image)
+        confidence_scores = []
+        pred_mask = np.zeros((640, 640), dtype=np.uint8)
+        detection_stats = []
 
-def create_confidence_plot(confidence_scores):
-    """Create confidence distribution plot"""
-    if not confidence_scores:
+        if results.boxes is not None:
+            for i, box in enumerate(results.boxes):
+                # Get box coordinates
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                
+                # Get confidence and class
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                label = CLASS_NAMES.get(cls_id, 'Unknown')
+                
+                confidence_scores.append(conf)
+                detection_stats.append({
+                    'Class': label,
+                    'Confidence': conf,
+                    'Area': (x2-x1)*(y2-y1)
+                })
+                
+                if conf > THRESHOLD:
+                    # Draw bounding box
+                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    
+                    # Add label and confidence score
+                    text = f"{label} {conf:.2f}"
+                    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                    text_x = x1
+                    text_y = y1 - 10 if y1 - 10 > 10 else y1 + 10
+                    
+                    # Draw text background
+                    cv2.rectangle(img, 
+                                (text_x, text_y - text_size[1] - 5), 
+                                (text_x + text_size[0], text_y + 5), 
+                                (255, 0, 0), 
+                                -1)
+                    
+                    # Draw text
+                    cv2.putText(img, 
+                              text, 
+                              (text_x, text_y), 
+                              cv2.FONT_HERSHEY_SIMPLEX, 
+                              0.6, 
+                              (255, 255, 255), 
+                              2)
+
+                    # Handle segmentation masks
+                    if hasattr(results, 'masks') and results.masks is not None and i < len(results.masks):
+                        try:
+                            mask = results.masks[i].data[0].cpu().numpy()
+                            mask_resized = cv2.resize(mask, (x2 - x1, y2 - y1))
+                            mask_resized = (mask_resized > 0.5).astype(np.uint8) * 255
+                            pred_mask[y1:y2, x1:x2] = mask_resized
+                            
+                            # Color overlay
+                            roi = img[y1:y2, x1:x2]
+                            roi[mask_resized > 127] = (
+                                roi[mask_resized > 127] * 0.7 + 
+                                np.array([0, 255, 0]) * 0.3
+                            ).astype(np.uint8)
+                            
+                            # Add mask statistics
+                            detection_stats[-1].update({
+                                'Mask Area': np.sum(mask_resized > 127),
+                                'Mask Coverage': np.sum(mask_resized > 127) / ((x2-x1)*(y2-y1))
+                            })
+                            
+                        except Exception as e:
+                            st.warning(f"⚠️ Warning: Could not process mask for detection {i}: {str(e)}")
+
+        return img, confidence_scores, pred_mask, detection_stats
+
+    except Exception as e:
+        st.error(f"❌ Error in draw_bboxes_and_masks: {str(e)}")
+        return image, [], np.zeros((640, 640), dtype=np.uint8), []
+
+def create_analysis_plots(detection_stats):
+    """Create various analysis plots"""
+    if not detection_stats:
         return None
     
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(
-        x=confidence_scores,
-        nbinsx=20,
-        name='Confidence Distribution',
-        marker_color='#00a6ed'
-    ))
-    fig.update_layout(
-        title='Detection Confidence Distribution',
-        xaxis_title='Confidence Score',
-        yaxis_title='Frequency',
-        showlegend=False,
-        width=600,
-        height=400
-    )
-    return fig
+    df = pd.DataFrame(detection_stats)
+    
+    # Confidence distribution by class
+    fig_conf = px.box(df, x='Class', y='Confidence', title='Confidence Distribution by Class')
+    fig_conf.update_layout(height=400)
+    
+    # Area vs Confidence scatter plot
+    if 'Mask Area' in df.columns:
+        fig_area = px.scatter(df, x='Area', y='Mask Area', 
+                            color='Confidence', size='Mask Coverage',
+                            title='Detection Area vs Mask Area',
+                            labels={'Area': 'Bounding Box Area', 
+                                   'Mask Area': 'Segmentation Mask Area'})
+        fig_area.update_layout(height=400)
+        
+        return fig_conf, fig_area
+    
+    return fig_conf, None
 
-def calculate_metrics(true_mask, pred_mask):
-    """Calculate evaluation metrics"""
+def calculate_advanced_metrics(pred_mask):
+    """Calculate advanced metrics for the mask"""
     try:
-        true_mask = cv2.resize(true_mask, (640, 640))
-        pred_mask_binary = (pred_mask > 0).astype(np.uint8)
-        true_mask_binary = (true_mask > 0).astype(np.uint8)
+        if not np.any(pred_mask):
+            return {}
         
-        intersection = np.logical_and(true_mask_binary, pred_mask_binary)
-        union = np.logical_or(true_mask_binary, pred_mask_binary)
+        # Calculate mask properties
+        contours, _ = cv2.findContours(pred_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        dice = 2 * np.sum(intersection) / (np.sum(pred_mask_binary) + np.sum(true_mask_binary) + 1e-6)
-        iou = np.sum(intersection) / (np.sum(union) + 1e-6)
+        metrics = {
+            'Number of Regions': len(contours),
+            'Total Area': np.sum(pred_mask > 0),
+            'Coverage Ratio': np.sum(pred_mask > 0) / pred_mask.size
+        }
         
-        precision = precision_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
-        recall = recall_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
-        f1 = f1_score(true_mask_binary.flatten(), pred_mask_binary.flatten(), zero_division=0)
+        if contours:
+            # Calculate shape metrics for the largest contour
+            largest_contour = max(contours, key=cv2.contourArea)
+            metrics.update({
+                'Perimeter': cv2.arcLength(largest_contour, True),
+                'Circularity': 4 * np.pi * cv2.contourArea(largest_contour) / 
+                              (cv2.arcLength(largest_contour, True) ** 2) if cv2.arcLength(largest_contour, True) > 0 else 0
+            })
         
-        return dice, iou, precision, recall, f1
+        return metrics
+        
     except Exception as e:
-        st.error(f"❌ Error calculating metrics: {str(e)}")
-        return 0, 0, 0, 0, 0
+        st.error(f"❌ Error calculating advanced metrics: {str(e)}")
+        return {}
+
+def create_3d_surface_plot(mask):
+    """Create 3D surface plot of segmentation mask"""
+    try:
+        x, y = np.meshgrid(
+            np.linspace(0, mask.shape[1], mask.shape[1]),
+            np.linspace(0, mask.shape[0], mask.shape[0])
+        )
+        
+        fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y)])
+        fig.update_layout(
+            title='3D Surface Plot of Segmentation Mask',
+            scene=dict(
+                xaxis_title='Width',
+                yaxis_title='Height',
+                zaxis_title='Intensity'
+            ),
+            width=None,
+            height=600,
+            margin=dict(l=0, r=0, b=0, t=30)
+        )
+        return fig
+    except Exception as e:
+        st.error(f"❌ Error creating 3D plot: {str(e)}")
+        return None
 
 def create_metrics_dashboard(metrics):
     """Create metrics dashboard with styled cards"""
-    cols = st.columns(5)
-    
-    metric_styles = {
-        'Dice Score': ('🎯', '#FF6B6B'),
-        'IoU': ('🔄', '#4ECDC4'),
-        'Precision': ('📊', '#45B7D1'),
-        'Recall': ('📈', '#96CEB4'),
-        'F1 Score': ('⭐', '#FFEEAD')
-    }
-    
-    for (metric_name, value), col in zip(metrics.items(), cols):
-        icon, color = metric_styles[metric_name]
-        with col:
-            st.markdown(f"""
-            <div style='
-                background-color: {color}22;
-                padding: 20px;
-                border-radius: 10px;
-                text-align: center;
-                border: 2px solid {color};
-            '>
-                <h3 style='margin: 0; color: #31333F;'>{icon} {metric_name}</h3>
-                <p style='font-size: 24px; margin: 10px 0; color: {color};'>{value:.3f}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    try:
+        cols = st.columns(len(metrics))
+        
+        metric_styles = {
+            'Dice Score': ('🎯', '#FF6B6B'),
+            'IoU': ('🔄', '#4ECDC4'),
+            'Precision': ('📊', '#45B7D1'),
+            'Recall': ('📈', '#96CEB4'),
+            'F1 Score': ('⭐', '#FFEEAD'),
+            'Number of Regions': ('🔢', '#845EC2'),
+            'Total Area': ('📏', '#D65DB1'),
+            'Coverage Ratio': ('📊', '#FF6F91'),
+            'Perimeter': ('⭕', '#FF9671'),
+            'Circularity': ('🔄', '#FFC75F')
+        }
+        
+        for (metric_name, value), col in zip(metrics.items(), cols):
+            icon, color = metric_styles.get(metric_name, ('📊', '#666666'))
+            with col:
+                st.markdown(f"""
+                <div style='
+                    background-color: {color}22;
+                    padding: 20px;
+                    border-radius: 10px;
+                    text-align: center;
+                    border: 2px solid {color};
+                    height: 100%;
+                '>
+                    <h3 style='margin: 0; color: #31333F; font-size: 1rem;'>{icon} {metric_name}</h3>
+                    <p style='font-size: 1.5rem; margin: 10px 0; color: {color};'>
+                        {value:.3f if isinstance(value, float) else value}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"❌ Error creating metrics dashboard: {str(e)}")
 
 def process_and_visualize(image, model):
     """Process image and create visualizations"""
-    with st.spinner("🔄 Processing image..."):
-        # Create tabs for different visualizations
-        tab1, tab2, tab3 = st.tabs(["📊 Analysis", "🎯 Segmentation", "📈 3D View"])
-        
-        # Process image
-        img_tensor = process_image(image)
-        if img_tensor is None:
-            return
-        
-        # Run inference
-        try:
-            results = model(img_tensor)[0]
-            img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results)
+    try:
+        with st.spinner("🔄 Processing image..."):
+            # Create tabs for different visualizations
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📊 Analysis", 
+                "🎯 Segmentation", 
+                "📈 3D View",
+                "📑 Detailed Metrics"
+            ])
             
-            with tab1:
-                st.subheader("Analysis Results")
-                if np.any(pred_mask):
-                    ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
-                    dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
+            # Process image
+            img_tensor = process_image(image)
+            if img_tensor is None:
+                return
+            
+            # Run inference
+            results = model(img_tensor)[0]
+            img_with_bboxes, confidence_scores, pred_mask, detection_stats = draw_bboxes_and_masks(image, results)
+            
+            # Calculate metrics
+            if np.any(pred_mask):
+                ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
+                dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
+                advanced_metrics = calculate_advanced_metrics(pred_mask)
+                
+                # Analysis tab
+                with tab1:
+                    st.markdown("### 📊 Analysis Results")
                     
+                    # Basic metrics
                     metrics = {
                         'Dice Score': dice,
                         'IoU': iou,
@@ -208,33 +347,55 @@ def process_and_visualize(image, model):
                     }
                     create_metrics_dashboard(metrics)
                     
-                    conf_fig = create_confidence_plot(confidence_scores)
-                    if conf_fig:
-                        st.plotly_chart(conf_fig, use_container_width=True)
-                else:
-                    st.warning("⚠️ No detections found in the image")
-            
-            with tab2:
-                st.subheader("Segmentation Results")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
-                with col2:
-                    mask_overlay = np.zeros_like(img_with_bboxes)
-                    mask_overlay[pred_mask == 255] = (0, 255, 0)
-                    combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
-                    st.image(combined_img, caption='Segmentation Overlay', use_column_width=True)
-            
-            with tab3:
-                st.subheader("3D Visualization")
-                if np.any(pred_mask):
+                    # Detection analysis plots
+                    st.markdown("### 📈 Detection Analysis")
+                    fig_conf, fig_area = create_analysis_plots(detection_stats)
+                    if fig_conf:
+                        st.plotly_chart(fig_conf, use_container_width=True)
+                    if fig_area:
+                        st.plotly_chart(fig_area, use_container_width=True)
+                
+                # Segmentation tab
+                with tab2:
+                    st.markdown("### 🎯 Segmentation Results")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
+                    with col2:
+                        mask_overlay = np.zeros_like(img_with_bboxes)
+                        mask_overlay[pred_mask == 255] = (0, 255, 0)
+                        combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
+                        st.image(combined_img, caption='Segmentation Overlay', use_column_width=True)
+                
+                # 3D View tab
+                with tab3:
+                    st.markdown("### 📈 3D Visualization")
                     surface_plot = create_3d_surface_plot(pred_mask)
-                    st.plotly_chart(surface_plot, use_container_width=True)
-                else:
-                    st.warning("⚠️ No mask data available for 3D visualization")
+                    if surface_plot:
+                        st.plotly_chart(surface_plot, use_container_width=True)
+                
+                # Detailed Metrics tab
+                with tab4:
+                    st.markdown("### 📑 Detailed Analysis")
                     
-        except Exception as e:
-            st.error(f"❌ Error during processing: {str(e)}")
+                    # Advanced metrics
+                    st.markdown("#### Advanced Metrics")
+                    create_metrics_dashboard(advanced_metrics)
+                    
+                    # Detection details
+                    if detection_stats:
+                        st.markdown("#### Detection Details")
+                        df = pd.DataFrame(detection_stats)
+                        st.dataframe(df, use_container_width=True)
+                        
+                        # Additional statistics
+                        st.markdown("#### Statistical Summary")
+                        st.dataframe(df.describe(), use_container_width=True)
+            else:
+                st.warning("⚠️ No detections found in the image")
+                
+    except Exception as e:
+        st.error(f"❌ Error during processing: {str(e)}")
 
 def main():
     # Sidebar
@@ -251,9 +412,15 @@ def main():
         st.markdown("---")
         st.markdown("""
         ### 📋 Information
-        - Model: Deep Learning AI
+        - Model: YOLOv5
         - Classes: Left & Right Ventricle
         - Resolution: 640x640
+        
+        ### 🔍 Analysis Features
+        - Ventricle Detection
+        - Segmentation Analysis
+        - 3D Visualization
+        - Advanced Metrics
         """)
 
     # Main content
@@ -263,11 +430,13 @@ def main():
     deep learning for segmentation and detection of cardiac structures.
     """)
     
+    # Load model
     model = load_model()
     if model is None:
         st.warning("⚠️ Please ensure you have a stable internet connection and try reloading the page.")
         return
 
+    # Image processing
     if src == 'Upload Image':
         uploaded_file = st.file_uploader(
             "Choose an image...",
