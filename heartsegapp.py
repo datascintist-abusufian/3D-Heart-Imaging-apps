@@ -21,7 +21,7 @@ from datetime import datetime
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
 MODEL_PATH = "yolov5s.pt"
 CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
-THRESHOLD = 0.3
+THRESHOLD = 0.1
 
 # Page configuration
 st.set_page_config(
