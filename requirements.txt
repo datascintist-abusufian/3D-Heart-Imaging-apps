@@ -1,25 +1,29 @@
-# Core dependencies
-numpy>=1.22.4
-matplotlib>=3.3
-opencv-python-headless
-Pillow>=7.1.2
-PyYAML>=5.3.1
-requests>=2.23.0
-scipy>=1.4.1
-torch>=1.7.0
-torchvision>=0.8.1
-tqdm>=4.64.0
-streamlit>=1.22.0
-wget>=3.2
-psutil
-scikit-learn  # Added scikit-learn
+# Core ML & Data Processing
+numpy>=1.22.4,<2.0.0
+torch>=1.7.0,<3.0.0
+torchvision>=0.8.1,<1.0.0
+ultralytics>=8.0.0,<9.0.0
+scikit-learn>=1.0.2,<2.0.0
 
-# Plotting
-pandas>=1.1.4
-seaborn>=0.11.0
+# Image Processing
+Pillow>=9.0.0,<10.0.0
+opencv-python-headless>=4.6.0,<5.0.0
 
-# Deploy tools
-setuptools>=65.5.1
+# Web App
+streamlit>=1.22.0,<2.0.0
 
-# YOLOv5
-ultralytics
+# Data Handling & Utilities
+PyYAML>=5.3.1,<7.0.0
+requests>=2.23.0,<3.0.0
+tqdm>=4.64.0,<5.0.0
+wget>=3.2,<4.0.0
+psutil>=5.8.0,<6.0.0
+
+# Visualization
+matplotlib>=3.3.0,<4.0.0
+seaborn>=0.11.0,<1.0.0
+plotly>=5.13.0,<6.0.0
+pandas>=1.1.4,<2.0.0
+
+# Development
+setuptools>=65.5.1,<68.0.0
