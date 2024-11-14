@@ -13,6 +13,12 @@ import plotly.express as px
 from sklearn.metrics import jaccard_score, precision_score, recall_score
 import time
 
+# --- Constants ---
+MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
+MODEL_PATH = "yolov5s.pt"
+CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
+THRESHOLD = 0.3
+
 # --- Page Configuration ---
 st.set_page_config(
     page_title="3D Heart MRI Analysis",
@@ -20,12 +26,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# --- Constants ---
-MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
-MODEL_PATH = "yolov5s.pt"
-CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
-THRESHOLD = 0.3
 
 # --- Custom CSS ---
 st.markdown("""
@@ -48,152 +48,85 @@ st.markdown("""
         padding: 0.5rem 1rem;
         margin: 1rem 0;
     }
-    .analysis-header {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin: 1rem 0;
-        color: #31333F;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource
 def load_model():
-    with st.spinner("🔄 Loading model... Please wait."):
-        try:
-            if 'model' not in st.session_state:
-                response = requests.get(MODEL_URL)
-                model_path = BytesIO(response.content)
-                st.session_state.model = YOLO(model_path)
-            return st.session_state.model
-        except Exception as e:
-            st.error(f"❌ Error loading model: {e}")
-            return None
+    """Load the YOLO model with proper error handling"""
+    try:
+        # Create a models directory if it doesn't exist
+        os.makedirs('models', exist_ok=True)
+        model_path = os.path.join('models', MODEL_PATH)
 
-def create_3d_surface_plot(mask):
-    x = np.linspace(0, mask.shape[1], mask.shape[1])
-    y = np.linspace(0, mask.shape[0], mask.shape[0])
-    x, y = np.meshgrid(x, y)
-    
-    fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y)])
-    fig.update_layout(
-        title='3D Surface Plot of Segmentation Mask',
-        scene=dict(
-            xaxis_title='Width',
-            yaxis_title='Height',
-            zaxis_title='Intensity'
-        ),
-        width=600,
-        height=500
-    )
-    return fig
+        # Download the model if it doesn't exist
+        if not os.path.exists(model_path):
+            with st.spinner("📥 Downloading model..."):
+                response = requests.get(MODEL_URL, stream=True)
+                response.raise_for_status()  # Raise an error for bad responses
+                
+                # Save the model file
+                with open(model_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                st.success("✅ Model downloaded successfully!")
 
-def create_confidence_plot(confidence_scores):
-    if not confidence_scores:
+        # Load the model
+        with st.spinner("🔄 Loading model..."):
+            model = YOLO(model_path)
+            st.success("✅ Model loaded successfully!")
+            return model
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Error downloading model: {str(e)}")
         return None
-    
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(
-        x=confidence_scores,
-        nbinsx=20,
-        name='Confidence Distribution',
-        marker_color='#00a6ed'
-    ))
-    fig.update_layout(
-        title='Detection Confidence Distribution',
-        xaxis_title='Confidence Score',
-        yaxis_title='Frequency',
-        showlegend=False,
-        width=600,
-        height=400
-    )
-    return fig
+    except Exception as e:
+        st.error(f"❌ Error loading model: {str(e)}")
+        return None
 
-def create_metrics_dashboard(metrics):
-    cols = st.columns(5)
-    
-    metric_styles = {
-        'Dice Score': ('🎯', '#FF6B6B'),
-        'IoU': ('🔄', '#4ECDC4'),
-        'Precision': ('📊', '#45B7D1'),
-        'Recall': ('📈', '#96CEB4'),
-        'F1 Score': ('⭐', '#FFEEAD')
-    }
-    
-    for (metric_name, value), col in zip(metrics.items(), cols):
-        icon, color = metric_styles[metric_name]
-        with col:
-            st.markdown(f"""
-            <div style='
-                background-color: {color}22;
-                padding: 20px;
-                border-radius: 10px;
-                text-align: center;
-                border: 2px solid {color};
-            '>
-                <h3 style='margin: 0; color: #31333F;'>{icon} {metric_name}</h3>
-                <p style='font-size: 24px; margin: 10px 0; color: {color};'>{value:.3f}</p>
-            </div>
-            """, unsafe_allow_html=True)
+def process_image(image):
+    """Process the input image"""
+    try:
+        transform = transforms.Compose([
+            transforms.Resize((640, 640)),
+            transforms.ToTensor(),
+        ])
+        return transform(image).unsqueeze(0)
+    except Exception as e:
+        st.error(f"❌ Error processing image: {str(e)}")
+        return None
 
-def process_and_visualize(image, model):
-    with st.spinner("🔄 Processing image..."):
-        # Create tabs for different visualizations
-        tab1, tab2, tab3 = st.tabs(["📊 Analysis", "🎯 Segmentation", "📈 3D Visualization"])
-        
-        progress_bar = st.progress(0)
-        for i in range(100):
-            time.sleep(0.01)
-            progress_bar.progress(i + 1)
-        
-        # Process image
-        img_tensor = process_image(image)
-        if img_tensor is None:
-            return
-        
-        results = model(img_tensor)[0]
-        img_with_bboxes, confidence_scores, pred_mask = draw_bboxes_and_masks(image, results)
-        
-        with tab1:
-            st.markdown("<h2 class='analysis-header'>Analysis Results</h2>", unsafe_allow_html=True)
-            
-            if np.any(pred_mask):
-                ground_truth_mask = np.zeros((640, 640), dtype=np.uint8)
-                dice, iou, precision, recall, f1 = calculate_metrics(ground_truth_mask, pred_mask)
+def draw_bboxes_and_masks(image, results):
+    """Draw bounding boxes and masks on the image"""
+    img = np.array(image)
+    confidence_scores = []
+    pred_mask = np.zeros((640, 640), dtype=np.uint8)
+
+    try:
+        if results.boxes is not None:
+            for i, box in enumerate(results.boxes):
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                label = CLASS_NAMES.get(cls_id, 'Unknown')
                 
-                metrics = {
-                    'Dice Score': dice,
-                    'IoU': iou,
-                    'Precision': precision,
-                    'Recall': recall,
-                    'F1 Score': f1
-                }
-                create_metrics_dashboard(metrics)
+                confidence_scores.append(conf)
                 
-                conf_fig = create_confidence_plot(confidence_scores)
-                if conf_fig:
-                    st.plotly_chart(conf_fig, use_container_width=True)
-            
-        with tab2:
-            st.markdown("<h2 class='analysis-header'>Segmentation Results</h2>", unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
-            with col2:
-                mask_overlay = np.zeros_like(img_with_bboxes)
-                mask_overlay[pred_mask == 255] = (0, 255, 0)
-                combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
-                st.image(combined_img, caption='Segmentation Overlay', use_column_width=True)
-                
-        with tab3:
-            st.markdown("<h2 class='analysis-header'>3D Visualization</h2>", unsafe_allow_html=True)
-            
-            if np.any(pred_mask):
-                surface_plot = create_3d_surface_plot(pred_mask)
-                st.plotly_chart(surface_plot, use_container_width=True)
-            else:
-                st.warning("⚠️ No mask data available for 3D visualization")
+                if conf > THRESHOLD:
+                    cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    text = f"{label} {conf:.2f}"
+                    cv2.putText(img, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+
+                    if results.masks is not None and i < len(results.masks):
+                        mask = results.masks[i].data.cpu().numpy()[0]
+                        mask_resized = cv2.resize(mask, (x2 - x1, y2 - y1))
+                        mask_resized = (mask_resized > 0.5).astype(np.uint8) * 255
+                        pred_mask[y1:y2, x1:x2] = mask_resized
+
+        return img, confidence_scores, pred_mask
+    except Exception as e:
+        st.error(f"❌ Error processing detection results: {str(e)}")
+        return img, [], pred_mask
 
 def main():
     # Sidebar
@@ -223,10 +156,10 @@ def main():
     deep learning for segmentation and detection of cardiac structures.
     """)
     
-    # Load model
+    # Load model with proper error handling
     model = load_model()
     if model is None:
-        st.error("❌ Failed to load model. Please try again.")
+        st.warning("⚠️ Please make sure you have a stable internet connection and try reloading the page.")
         return
 
     # Image processing
@@ -237,34 +170,35 @@ def main():
             help="Upload a heart MRI image for analysis"
         )
         if uploaded_file:
-            image = Image.open(uploaded_file).convert("RGB")
-            st.image(image, caption='Uploaded Image', width=300)
-            
-            if st.button("🔍 Analyze Image", type="primary"):
-                process_and_visualize(image, model)
+            try:
+                image = Image.open(uploaded_file).convert("RGB")
+                st.image(image, caption='Uploaded Image', width=300)
+                
+                if st.button("🔍 Analyze Image", type="primary"):
+                    process_and_visualize(image, model)
+            except Exception as e:
+                st.error(f"❌ Error loading uploaded image: {str(e)}")
     
     else:
-        col1, col2 = st.columns([1, 2])
-        with col1:
+        try:
             selected_image = st.slider(
                 "Select sample image",
                 1, 50,
                 help="Choose a sample image from our test dataset"
             )
-        
-        try:
+            
             image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{selected_image}.jpg"
             response = requests.get(image_url)
-            image = Image.open(BytesIO(response.content)).convert("RGB")
+            response.raise_for_status()
             
-            with col2:
-                st.image(image, caption=f'Sample Image #{selected_image}', width=300)
+            image = Image.open(BytesIO(response.content)).convert("RGB")
+            st.image(image, caption=f'Sample Image #{selected_image}', width=300)
             
             if st.button("🔍 Analyze Image", type="primary"):
                 process_and_visualize(image, model)
                 
         except Exception as e:
-            st.error(f"❌ Error loading sample image: {e}")
+            st.error(f"❌ Error loading sample image: {str(e)}")
 
     # Footer
     st.markdown("---")
