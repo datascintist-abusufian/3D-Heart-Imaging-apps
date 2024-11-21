@@ -8,12 +8,10 @@ from torchvision.transforms import transforms
 from io import BytesIO
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
-from datetime import datetime
-import json  # Add this import
+import json
 
 # Constants and Configuration
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
@@ -55,546 +53,118 @@ st.markdown("""
         margin: 1rem 0;
         color: #31333F;
     }
-    .debug-info {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 1rem 0;
-        font-family: monospace;
-    }
-    .metric-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #00a6ed;
-    }
-    .alert {
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 1rem 0;
-    }
-    .alert-info { background-color: #e3f2fd; }
-    .alert-warning { background-color: #fff3cd; }
-    .alert-error { background-color: #f8d7da; }
     </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
 if 'model' not in st.session_state:
     st.session_state.model = None
-if 'previous_calculations' not in st.session_state:
-    st.session_state.previous_calculations = []
 if 'debug_mode' not in st.session_state:
     st.session_state.debug_mode = False
 
 @st.cache_resource
 def load_model():
-    """Load and configure YOLO model with error handling"""
+    """Load YOLO model and handle errors."""
     try:
-        # Create models directory if it doesn't exist
-        os.makedirs('models', exist_ok=True)
-        
-        # Download model if not exists
+        os.makedirs("models", exist_ok=True)
         if not os.path.exists(MODEL_PATH):
             with st.spinner("📥 Downloading model..."):
-                st.info("Initializing model download. Please wait...")
                 response = requests.get(MODEL_URL, stream=True)
                 response.raise_for_status()
-                
-                with open(MODEL_PATH, 'wb') as f:
+                with open(MODEL_PATH, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
                 st.success("✅ Model downloaded successfully!")
-        
-        # Load and configure model
         with st.spinner("🔄 Loading model..."):
             model = YOLO(MODEL_PATH)
-            model.conf = CONFIDENCE_THRESHOLD  # Set confidence threshold
-            model.iou = 0.45  # Set IoU threshold
-            model.max_det = 100  # Maximum detections
-            model.task = 'detect'
-            st.success("✅ Model loaded successfully!")
+            model.conf = CONFIDENCE_THRESHOLD
+            model.iou = 0.45
+            model.max_det = 100
             return model
-            
     except requests.exceptions.RequestException as e:
-        st.error(f"❌ Network error while downloading model: {str(e)}")
+        st.error(f"❌ Error downloading model: {str(e)}")
     except Exception as e:
         st.error(f"❌ Error loading model: {str(e)}")
     return None
 
 def process_image(image):
-    """Process and prepare image for model inference"""
+    """Preprocess image for inference."""
     try:
-        # Ensure image is RGB
         if image.mode != 'RGB':
             image = image.convert('RGB')
-        
-        # Resize image
         image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
-        
-        # Convert to numpy array
-        img_array = np.array(image)
-        
-        # Normalize pixel values
-        img_array = img_array / 255.0
-        
+        img_array = np.array(image) / 255.0
         return img_array, image
-        
     except Exception as e:
         st.error(f"❌ Error processing image: {str(e)}")
         return None, None
 
 def draw_detections(image, results):
-    """Draw bounding boxes and create detection visualization"""
+    """Draw bounding boxes and handle errors."""
     try:
-        # Create copy of image for drawing
         img_draw = np.array(image).copy()
         confidence_scores = []
         detection_stats = []
-        
-        # Create empty mask
         pred_mask = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8)
-        
-        if not hasattr(results, 'boxes') or results.boxes is None:
-            return img_draw, [], pred_mask, []
-            
-        # Process each detection
-        for i, box in enumerate(results.boxes):
-            # Get box coordinates
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            
-            # Get confidence and class
-            conf = float(box.conf[0])
-            cls_id = int(box.cls[0])
-            
-            if conf > CONFIDENCE_THRESHOLD:
-                # Draw bounding box
-                cv2.rectangle(img_draw, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                
-                # Add label
-                label = f"{CLASS_NAMES[cls_id]} {conf:.2f}"
-                cv2.putText(img_draw, label, (x1, y1-10), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                
-                # Add to confidence scores
-                confidence_scores.append(conf)
-                
-                # Add detection statistics
-                detection_stats.append({
-                    'Class': CLASS_NAMES[cls_id],
-                    'Confidence': conf,
-                    'Area': (x2-x1)*(y2-y1),
-                    'Center X': (x1+x2)/2,
-                    'Center Y': (y1+y2)/2
-                })
-                
-                # Handle segmentation mask if available
-                if hasattr(results, 'masks') and results.masks is not None:
-                    try:
-                        mask = results.masks[i].data.cpu().numpy()
-                        mask = cv2.resize(mask, (x2-x1, y2-y1))
-                        mask = (mask > 0.5).astype(np.uint8) * 255
-                        pred_mask[y1:y2, x1:x2] = mask
-                    except Exception as e:
-                        if st.session_state.debug_mode:
-                            st.warning(f"Mask processing error: {str(e)}")
-        
+        if hasattr(results, 'boxes') and results.boxes:
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                if conf > CONFIDENCE_THRESHOLD:
+                    cv2.rectangle(img_draw, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    label = f"{CLASS_NAMES[cls_id]} {conf:.2f}"
+                    cv2.putText(img_draw, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    confidence_scores.append(conf)
+                    detection_stats.append({'Class': CLASS_NAMES[cls_id], 'Confidence': conf, 'Area': (x2 - x1) * (y2 - y1)})
         return img_draw, confidence_scores, pred_mask, detection_stats
-        
     except Exception as e:
         st.error(f"❌ Error drawing detections: {str(e)}")
         return image, [], np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8), []
 
-def create_visualization(image, results):
-    """Create comprehensive visualization of results"""
-    try:
-        # Draw detections
-        img_with_boxes, confidence_scores, pred_mask, detection_stats = draw_detections(image, results)
-        
-        # Create visualizations
-        visualizations = {}
-        
-        # Original with detections
-        visualizations['detections'] = img_with_boxes
-        
-        # Segmentation mask overlay if available
-        if np.any(pred_mask):
-            mask_overlay = np.zeros_like(img_with_boxes)
-            mask_overlay[pred_mask == 255] = [0, 255, 0]  # Green overlay
-            overlay = cv2.addWeighted(img_with_boxes, 0.7, mask_overlay, 0.3, 0)
-            visualizations['segmentation'] = overlay
-        
-        # Confidence distribution
-        if confidence_scores:
-            fig = go.Figure()
-            fig.add_trace(go.Histogram(
-                x=confidence_scores,
-                nbinsx=20,
-                marker_color='#00a6ed'
-            ))
-            fig.update_layout(
-                title='Detection Confidence Distribution',
-                xaxis_title='Confidence',
-                yaxis_title='Count',
-                height=400
-            )
-            visualizations['confidence_dist'] = fig
-        
-        return visualizations, detection_stats
-        
-    except Exception as e:
-        st.error(f"❌ Error creating visualization: {str(e)}")
-        return {}, []
-
-def calculate_metrics(detections, mask):
-    """Calculate comprehensive analysis metrics"""
-    try:
-        metrics = {}
-        
-        # Detection metrics
-        if detections:
-            metrics.update({
-                'Total Detections': len(detections),
-                'Average Confidence': np.mean([d['Confidence'] for d in detections]),
-                'Max Confidence': max([d['Confidence'] for d in detections]),
-                'Average Area': np.mean([d['Area'] for d in detections])
-            })
-            
-            # Class distribution
-            class_counts = {}
-            for d in detections:
-                class_counts[d['Class']] = class_counts.get(d['Class'], 0) + 1
-            metrics['Class Distribution'] = class_counts
-        
-        # Mask metrics
-        if np.any(mask):
-            # Calculate mask properties
-            total_pixels = mask.size
-            mask_pixels = np.sum(mask > 0)
-            
-            metrics.update({
-                'Coverage (%)': (mask_pixels / total_pixels) * 100,
-                'Total Area (pixels)': mask_pixels
-            })
-            
-            # Calculate contour properties
-            contours, _ = cv2.findContours(mask.astype(np.uint8), 
-                                         cv2.RETR_EXTERNAL, 
-                                         cv2.CHAIN_APPROX_SIMPLE)
-            if contours:
-                largest_contour = max(contours, key=cv2.contourArea)
-                metrics.update({
-                    'Number of Regions': len(contours),
-                    'Perimeter': cv2.arcLength(largest_contour, True),
-                    'Compactness': (4 * np.pi * cv2.contourArea(largest_contour)) / 
-                                 (cv2.arcLength(largest_contour, True) ** 2)
-                })
-        
-        return metrics
-        
-    except Exception as e:
-        st.error(f"❌ Error calculating metrics: {str(e)}")
-        return {}
-
-def create_metrics_dashboard(metrics):
-    """Create interactive metrics dashboard with fixed formatting"""
-    try:
-        if not metrics:
-            return
-        
-        # Create metric cards
-        cols = st.columns(3)
-        
-        # Define metric styles
-        metric_styles = {
-            'Total Detections': ('🎯', '#FF6B6B'),
-            'Average Confidence': ('📊', '#4ECDC4'),
-            'Coverage (%)': ('📈', '#45B7D1'),
-            'Number of Regions': ('🔍', '#96CEB4'),
-            'Total Area (pixels)': ('📏', '#FFEEAD')
-        }
-        
-        # Display metrics in cards
-        for i, (metric_name, value) in enumerate(metrics.items()):
-            if metric_name == 'Class Distribution' or metric_name == 'mask':
-                continue  # Skip these special metrics
-                
-            with cols[i % 3]:
-                icon, color = metric_styles.get(metric_name, ('📌', '#666666'))
-                # Format value based on type
-                if isinstance(value, (int, np.integer)):
-                    formatted_value = f"{value:,}"
-                elif isinstance(value, (float, np.floating)):
-                    formatted_value = f"{value:.2f}"
-                else:
-                    formatted_value = str(value)
-                
-                st.markdown(f"""
-                    <div style='
-                        background-color: {color}22;
-                        padding: 20px;
-                        border-radius: 10px;
-                        text-align: center;
-                        border: 2px solid {color};
-                    '>
-                        <h3 style='margin: 0; color: #31333F; font-size: 1rem;'>
-                            {icon} {metric_name}
-                        </h3>
-                        <p class='metric-value' style='color: {color};'>
-                            {formatted_value}
-                        </p>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        # Display class distribution if available
-        if 'Class Distribution' in metrics:
-            st.markdown("### 📊 Class Distribution")
-            df = pd.DataFrame(list(metrics['Class Distribution'].items()),
-                            columns=['Class', 'Count'])
-            
-            fig = px.bar(df, x='Class', y='Count',
-                        color='Class',
-                        title="Detections by Class")
-            st.plotly_chart(fig, use_container_width=True)
-            
-    except Exception as e:
-        st.error(f"❌ Error creating dashboard: {str(e)}")
-        if st.session_state.debug_mode:
-            st.write("Debug details:", str(e))
-            
-def create_3d_visualization(mask):
-    """Create 3D surface plot of segmentation mask"""
-    try:
-        if not np.any(mask):
-            return None
-            
-        # Create meshgrid for 3D plot
-        x, y = np.meshgrid(
-            np.linspace(0, mask.shape[1], mask.shape[1]),
-            np.linspace(0, mask.shape[0], mask.shape[0])
-        )
-        
-        # Create 3D surface plot
-        fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y)])
-        
-        # Update layout
-        fig.update_layout(
-            title='3D Visualization of Segmentation Mask',
-            scene=dict(
-                xaxis_title='Width',
-                yaxis_title='Height',
-                zaxis_title='Intensity'
-            ),
-            width=None,
-            height=600,
-            margin=dict(l=0, r=0, b=0, t=30)
-        )
-        
-        return fig
-        
-    except Exception as e:
-        st.error(f"❌ Error creating 3D visualization: {str(e)}")
-        return None
-
-def create_analysis_report(image_name, metrics, timestamp):
-    """Generate analysis report with proper formatting"""
-    try:
-        # Create a copy of metrics without numpy arrays
-        report_metrics = {}
-        for key, value in metrics.items():
-            if key != 'mask':  # Skip the mask array
-                if isinstance(value, (np.integer, np.floating)):
-                    value = float(value)  # Convert numpy types to Python types
-                elif isinstance(value, dict):
-                    value = {k: float(v) if isinstance(v, (np.integer, np.floating)) else v 
-                            for k, v in value.items()}
-                report_metrics[key] = value
-
-        report = {
-            "Analysis Report": {
-                "Image": image_name,
-                "Date": timestamp,
-                "Metrics": report_metrics,
-                "Analysis Parameters": {
-                    "Confidence Threshold": float(CONFIDENCE_THRESHOLD),
-                    "Image Size": IMAGE_SIZE,
-                    "Model": "YOLOv5"
-                }
-            }
-        }
-        
-        return json.dumps(report, indent=2)
-        
-    except Exception as e:
-        st.error(f"❌ Error generating report: {str(e)}")
-        if st.session_state.debug_mode:
-            st.write("Debug details:", str(e))
-        return None
-
 def process_and_visualize(image, model):
-    """Process image and create visualizations"""
+    """Run model inference and visualize results."""
     try:
-        # Create tabs for results
-        tab1, tab2, tab3 = st.tabs([
-            "📊 Analysis Results",
-            "🎯 Detections View",
-            "📈 3D Visualization"
-        ])
-
-        # Debug information
-        if st.session_state.debug_mode:
-            st.write(f"Debug: Image size = {image.size}")
-            st.write(f"Debug: Model confidence = {model.conf}")
-
-        # Run model inference
-        with st.spinner("Running detection..."):
+        with st.spinner("🔄 Running model inference..."):
             results = model(image)
-            
-            if len(results) == 0:
-                st.warning("No detections found in the image")
+            if not results or not results[0].boxes:
+                st.warning("No detections found.")
                 return
-                
             result = results[0]
+            img_with_boxes, confidence_scores, pred_mask, detection_stats = draw_detections(image, result)
             
-            # Process detections
-            img_with_boxes = np.array(image).copy()
-            confidence_scores = []
-            detection_stats = []
+            st.markdown("### 🎯 Detection Results")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(image, caption="Original Image")
+            with col2:
+                st.image(img_with_boxes, caption="Detections")
             
-            if hasattr(result, 'boxes') and result.boxes is not None:
-                boxes = result.boxes
-                for box in boxes:
-                    # Get coordinates
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = float(box.conf[0])
-                    cls_id = int(box.cls[0])
-                    
-                    if conf > model.conf:
-                        # Draw box
-                        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        
-                        # Add label
-                        label = f"{CLASS_NAMES[cls_id]} {conf:.2f}"
-                        cv2.putText(img_with_boxes, label, (x1, y1-10),
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                        
-                        confidence_scores.append(conf)
-                        detection_stats.append({
-                            'Class': CLASS_NAMES[cls_id],
-                            'Confidence': conf,
-                            'Area': (x2-x1)*(y2-y1)
-                        })
-            
-            # Display results in tabs
-            with tab1:
-                st.markdown("### 📊 Analysis Results")
-                
-                if detection_stats:
-                    # Show detection statistics
-                    st.markdown("#### Detection Statistics")
-                    df = pd.DataFrame(detection_stats)
-                    st.dataframe(df)
-                    
-                    # Show confidence distribution
-                    st.markdown("#### Confidence Distribution")
-                    fig = px.histogram(
-                        df, x='Confidence',
-                        nbins=20,
-                        title="Detection Confidence Distribution"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Calculate and show metrics
-                    metrics = {
-                        'Total Detections': len(detection_stats),
-                        'Average Confidence': np.mean([d['Confidence'] for d in detection_stats]),
-                        'Average Area': np.mean([d['Area'] for d in detection_stats])
-                    }
-                    create_metrics_dashboard(metrics)
-                else:
-                    st.warning("No confident detections found")
-            
-            with tab2:
-                st.markdown("### 🎯 Detection Results")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("#### Original Image")
-                    st.image(image, caption='Input Image')
-                
-                with col2:
-                    st.markdown("#### Detections")
-                    st.image(img_with_boxes, caption='Detected Objects')
-            
-            with tab3:
-                st.markdown("### 📈 Detection Visualization")
-                if detection_stats:
-                    # Create scatter plot of detections
-                    fig = px.scatter(
-                        df,
-                        x='Area',
-                        y='Confidence',
-                        color='Class',
-                        size='Area',
-                        title="Detections Analysis"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("No data available for visualization")
-
+            if confidence_scores:
+                st.markdown("### 📊 Confidence Distribution")
+                fig = px.histogram(x=confidence_scores, nbins=10, title="Confidence Scores", labels={'x': 'Confidence'})
+                st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error(f"Error in processing: {str(e)}")
+        st.error(f"❌ Error during processing: {str(e)}")
         if st.session_state.debug_mode:
-            st.write("Debug details:", str(e))
+            st.write(f"Debug: {e}")
 
-# Update main function to use the new processing
 def main():
-    """Main application function"""
-    # ... (previous sidebar code remains the same)
-
-    # Main content
-    st.title("🫀 3D Heart MRI Analysis Dashboard")
+    st.title("🫀 3D Heart MRI Analysis")
+    st.markdown("Upload an MRI image to analyze cardiac structures.")
     
-    # Load model
-    if 'model' not in st.session_state or st.session_state.model is None:
+    if 'model' not in st.session_state or not st.session_state.model:
         st.session_state.model = load_model()
     
-    if st.session_state.model is None:
-        st.error("Model loading failed. Please check your connection and reload.")
-        return
-
-    # Image processing
-    try:
-        # Image selection (Upload or Sample)
-        uploaded_file = st.file_uploader(
-            "Choose an image...",
-            type=["jpg", "jpeg", "png"]
-        )
-
+    if st.session_state.model:
+        uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
         if uploaded_file:
-            image = Image.open(uploaded_file).convert('RGB')
-            st.image(image, caption='Uploaded Image', width=300)
-            
-            if st.button("🔍 Analyze Image", type="primary"):
+            image = Image.open(uploaded_file).convert("RGB")
+            st.image(image, caption="Uploaded Image", use_column_width=True)
+            if st.button("🔍 Analyze Image"):
                 process_and_visualize(image, st.session_state.model)
-        
-        else:
-            st.info("Please upload an image to begin analysis")
-            
-            # Sample image option
-            if st.button("Try with Sample Image"):
-                sample_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/1.jpg"
-                response = requests.get(sample_url)
-                if response.status_code == 200:
-                    image = Image.open(BytesIO(response.content)).convert('RGB')
-                    st.image(image, caption='Sample Image', width=300)
-                    process_and_visualize(image, st.session_state.model)
-                else:
-                    st.error("Failed to load sample image")
-
-    except Exception as e:
-        st.error(f"Error in application: {str(e)}")
-        if st.session_state.debug_mode:
-            st.write("Debug details:", str(e))
+    else:
+        st.error("Model loading failed. Check your connection and try again.")
 
 if __name__ == "__main__":
     main()
