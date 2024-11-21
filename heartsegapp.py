@@ -396,15 +396,26 @@ def create_3d_visualization(mask):
         return None
 
 def create_analysis_report(image_name, metrics, timestamp):
-    """Generate analysis report"""
+    """Generate analysis report with proper formatting"""
     try:
+        # Create a copy of metrics without numpy arrays
+        report_metrics = {}
+        for key, value in metrics.items():
+            if key != 'mask':  # Skip the mask array
+                if isinstance(value, (np.integer, np.floating)):
+                    value = float(value)  # Convert numpy types to Python types
+                elif isinstance(value, dict):
+                    value = {k: float(v) if isinstance(v, (np.integer, np.floating)) else v 
+                            for k, v in value.items()}
+                report_metrics[key] = value
+
         report = {
             "Analysis Report": {
                 "Image": image_name,
                 "Date": timestamp,
-                "Metrics": metrics,
+                "Metrics": report_metrics,
                 "Analysis Parameters": {
-                    "Confidence Threshold": CONFIDENCE_THRESHOLD,
+                    "Confidence Threshold": float(CONFIDENCE_THRESHOLD),
                     "Image Size": IMAGE_SIZE,
                     "Model": "YOLOv5"
                 }
@@ -415,6 +426,8 @@ def create_analysis_report(image_name, metrics, timestamp):
         
     except Exception as e:
         st.error(f"❌ Error generating report: {str(e)}")
+        if st.session_state.debug_mode:
+            st.write("Debug details:", str(e))
         return None
 
 def display_results(image, visualizations, metrics, detection_stats):
