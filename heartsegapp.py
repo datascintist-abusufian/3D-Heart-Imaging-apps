@@ -84,7 +84,7 @@ def load_model():
                         f.write(chunk)
                 st.success("✅ Model downloaded successfully!")
 
-       with st.spinner("🔄 Loading model..."):
+        with st.spinner("🔄 Loading model..."):
             st.write("Debug: Initializing YOLO model")
             model = YOLO(model_path)
             # Set model parameters
