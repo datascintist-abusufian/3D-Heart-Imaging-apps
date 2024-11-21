@@ -326,104 +326,49 @@ def process_and_visualize(image, model):
             st.write("Debug details:", str(e))
 
 def main():
-    """Main application function"""
-    # Sidebar
-    with st.sidebar:
-        st.title("🎛️ Control Panel")
-        st.markdown("---")
-        
-        # Image source selection
-        src = st.radio(
-            "📷 Select Image Source",
-            ['Upload Image', 'Sample Gallery'],
-            help="Choose image source"
-        )
-        
-        # Confidence threshold
-        conf_threshold = st.slider(
-            "Confidence Threshold",
-            min_value=0.1,
-            max_value=1.0,
-            value=CONFIDENCE_THRESHOLD,
-            step=0.05,
-            help="Adjust detection sensitivity"
-        )
-        
-        # Debug mode
-        st.session_state.debug_mode = st.checkbox(
-            "Debug Mode",
-            value=False,
-            help="Show debug information"
-        )
-        
-        st.markdown("---")
-        st.markdown("""
-            ### 📋 Model Information
-            - Architecture: YOLOv5
-            - Task: Object Detection
-            - Classes: Heart Ventricles
-            - Input Size: 640x640
-        """)
-
-    # Main content
     st.title("🫀 3D Heart MRI Analysis Dashboard")
     st.markdown("""
-        This advanced dashboard analyzes heart MRI images using deep learning for 
-        detection and analysis of cardiac structures.
+        Analyze cardiac structures using YOLO-based segmentation.
     """)
-    
-    # Load model
+
+    # Sidebar for image input and settings
+    with st.sidebar:
+        st.title("🎛️ Control Panel")
+        st.radio("Image Source:", ["Upload Image", "Sample Image"], key="image_source")
+        st.slider("Confidence Threshold", 0.1, 1.0, CONFIDENCE_THRESHOLD, 0.05, key="conf_threshold")
+        st.checkbox("Enable Debug Mode", key="debug_mode")
+
+    # Load YOLO model
     if st.session_state.model is None:
         st.session_state.model = load_model()
-    
-    if st.session_state.model is None:
-        st.error("❌ Model loading failed. Please check your connection and reload.")
-        return
-    
-    # Update model confidence threshold
-    st.session_state.model.conf = conf_threshold
-    
-    # Image processing
-    try:
-        if src == 'Upload Image':
-            uploaded_file = st.file_uploader(
-                "Choose an image...",
-                type=["jpg", "jpeg", "png"],
-                help="Upload a heart MRI image"
-            )
-            
-            if uploaded_file:
-                image = Image.open(uploaded_file).convert("RGB")
-                st.image(image, caption='Uploaded Image', width=300)
-                
-                if st.button("🔍 Analyze Image", type="primary"):
-                    process_and_visualize(image, st.session_state.model)
-        else:
-            selected_image = st.slider(
-                "Select sample image",
-                1, 50,
-                help="Choose from sample dataset"
-            )
-            
-            try:
-                image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{selected_image}.jpg"
-                response = requests.get(image_url)
-                response.raise_for_status()
-                
-                image = Image.open(BytesIO(response.content)).convert("RGB")
-                st.image(image, caption=f'Sample Image #{selected_image}', width=300)
-                
-                if st.button("🔍 Analyze Image", type="primary"):
-                    process_and_visualize(image, st.session_state.model)
-            except Exception as e:
-                st.error(f"❌ Error loading sample image: {str(e)}")
-                if st.session_state.debug_mode:
-                    st.write("Debug details:", str(e))
 
-    except Exception as e:
-        st.error(f"❌ Error in application: {str(e)}")
-        if st.session_state.debug_mode:
-            st.write("Debug details:", str(e))
+    if st.session_state.model is None:
+        st.error("Model loading failed. Please check your connection.")
+        return
+
+    # Update confidence threshold
+    st.session_state.model.conf = st.session_state.conf_threshold
+
+    # Image input
+    if st.session_state.image_source == "Upload Image":
+        uploaded_file = st.file_uploader("Upload an image:", type=["jpg", "jpeg", "png"])
+        if uploaded_file:
+            image = Image.open(uploaded_file).convert("RGB")
+            st.image(image, caption="Uploaded Image", use_column_width=True)
+            if st.button("Analyze Image"):
+                process_and_visualize(image, st.session_state.model)
+
+    elif st.session_state.image_source == "Sample Image":
+        sample_image_index = st.slider("Select Sample Image", 1, 10, 1)
+        sample_image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{sample_image_index}.jpg"
+        response = requests.get(sample_image_url)
+        if response.status_code == 200:
+            image = Image.open(BytesIO(response.content)).convert("RGB")
+            st.image(image, caption=f"Sample Image #{sample_image_index}", use_column_width=True)
+            if st.button("Analyze Sample Image"):
+                process_and_visualize(image, st.session_state.model)
+        else:
+            st.error("Failed to load sample image.")
 
     # Footer
     st.markdown("---")
