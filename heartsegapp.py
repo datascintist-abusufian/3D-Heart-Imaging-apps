@@ -70,6 +70,17 @@ st.markdown("""
 def load_model():
     """Load the YOLO model with debug information"""
     try:
+        model = YOLO(MODEL_PATH)
+        model.conf = 0.25  # Set confidence threshold
+        model.iou = 0.45   # Set IoU threshold
+        model.max_det = 100  # Maximum detections
+        model.task = 'detect'  # Set task type
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
+        
+    try:
         os.makedirs('models', exist_ok=True)
         model_path = os.path.join('models', MODEL_PATH)
 
