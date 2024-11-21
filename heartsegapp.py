@@ -4,14 +4,11 @@ from ultralytics import YOLO
 from PIL import Image
 import os
 import requests
-from torchvision.transforms import transforms
 from io import BytesIO
 import numpy as np
 import cv2
-import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
-import json
+import plotly.express as px
 
 # Constants and Configuration
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
@@ -28,39 +25,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .main { padding: 2rem; }
-    .metric-card {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-    }
-    .stButton>button {
-        width: 100%;
-        background-color: #00a6ed;
-        color: white;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        margin: 1rem 0;
-    }
-    .analysis-header {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin: 1rem 0;
-        color: #31333F;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # Initialize session state
 if 'model' not in st.session_state:
     st.session_state.model = None
-if 'debug_mode' not in st.session_state:
-    st.session_state.debug_mode = False
 
 @st.cache_resource
 def load_model():
@@ -87,18 +54,6 @@ def load_model():
         st.error(f"❌ Error loading model: {str(e)}")
     return None
 
-def process_image(image):
-    """Preprocess image for inference."""
-    try:
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
-        img_array = np.array(image) / 255.0
-        return img_array, image
-    except Exception as e:
-        st.error(f"❌ Error processing image: {str(e)}")
-        return None, None
-
 def draw_detections(image, results):
     """Draw bounding boxes and handle errors."""
     try:
@@ -122,6 +77,31 @@ def draw_detections(image, results):
         st.error(f"❌ Error drawing detections: {str(e)}")
         return image, [], np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8), []
 
+def create_3d_surface_visualization(mask):
+    """Create advanced 3D surface visualization."""
+    try:
+        if not np.any(mask):
+            st.warning("No segmentation mask available for visualization.")
+            return None
+        x, y = np.meshgrid(
+            np.linspace(0, mask.shape[1], mask.shape[1]),
+            np.linspace(0, mask.shape[0], mask.shape[0])
+        )
+        fig = go.Figure(data=[go.Surface(z=mask, x=x, y=y, colorscale='Viridis')])
+        fig.update_layout(
+            title='3D Surface Intensity Visualization',
+            scene=dict(
+                xaxis_title='Width',
+                yaxis_title='Height',
+                zaxis_title='Intensity'
+            ),
+            margin=dict(l=0, r=0, b=0, t=30)
+        )
+        return fig
+    except Exception as e:
+        st.error(f"❌ Error creating 3D visualization: {str(e)}")
+        return None
+
 def process_and_visualize(image, model):
     """Run model inference and visualize results."""
     try:
@@ -144,25 +124,47 @@ def process_and_visualize(image, model):
                 st.markdown("### 📊 Confidence Distribution")
                 fig = px.histogram(x=confidence_scores, nbins=10, title="Confidence Scores", labels={'x': 'Confidence'})
                 st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("### 📈 3D Visualization")
+            if np.any(pred_mask):
+                surface_fig = create_3d_surface_visualization(pred_mask)
+                if surface_fig:
+                    st.plotly_chart(surface_fig, use_container_width=True)
+            else:
+                st.info("No mask available for 3D visualization.")
     except Exception as e:
         st.error(f"❌ Error during processing: {str(e)}")
-        if st.session_state.debug_mode:
-            st.write(f"Debug: {e}")
 
 def main():
     st.title("🫀 3D Heart MRI Analysis")
-    st.markdown("Upload an MRI image to analyze cardiac structures.")
+    st.markdown("Analyze cardiac structures using YOLO-based segmentation.")
+    
+    # Sidebar
+    st.sidebar.header("Input Options")
+    input_type = st.sidebar.radio("Choose Input Type:", ["Sample Image", "Upload Image"])
     
     if 'model' not in st.session_state or not st.session_state.model:
         st.session_state.model = load_model()
     
     if st.session_state.model:
-        uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-        if uploaded_file:
-            image = Image.open(uploaded_file).convert("RGB")
-            st.image(image, caption="Uploaded Image", use_column_width=True)
-            if st.button("🔍 Analyze Image"):
-                process_and_visualize(image, st.session_state.model)
+        if input_type == "Sample Image":
+            sample_image_index = st.sidebar.slider("Select Sample Image", 1, 10, 1)
+            sample_image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{sample_image_index}.jpg"
+            response = requests.get(sample_image_url)
+            if response.status_code == 200:
+                image = Image.open(BytesIO(response.content)).convert("RGB")
+                st.image(image, caption=f"Sample Image #{sample_image_index}", use_column_width=True)
+                if st.button("🔍 Analyze Sample Image"):
+                    process_and_visualize(image, st.session_state.model)
+            else:
+                st.error("Failed to load sample image.")
+        elif input_type == "Upload Image":
+            uploaded_file = st.sidebar.file_uploader("Upload an Image", type=["jpg", "jpeg", "png"])
+            if uploaded_file:
+                image = Image.open(uploaded_file).convert("RGB")
+                st.image(image, caption="Uploaded Image", use_column_width=True)
+                if st.button("🔍 Analyze Uploaded Image"):
+                    process_and_visualize(image, st.session_state.model)
     else:
         st.error("Model loading failed. Check your connection and try again.")
 
