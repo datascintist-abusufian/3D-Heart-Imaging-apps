@@ -334,13 +334,9 @@ def create_metrics_dashboard(metrics):
         st.error(f"❌ Error creating metrics dashboard: {str(e)}")
 
 def process_and_visualize(image, model):
-    """Process image and create visualizations"""
+    """Process image and create visualizations with better error handling"""
     try:
         with st.spinner("🔄 Processing image..."):
-            # Add debug information
-            st.write("Debug: Image size:", image.size)
-            st.write("Debug: Model confidence threshold:", model.conf)
-            
             # Create tabs
             tab1, tab2, tab3 = st.tabs([
                 "📊 Analysis Results", 
@@ -348,72 +344,149 @@ def process_and_visualize(image, model):
                 "📈 3D Visualization"
             ])
             
-            # Process image
-            img_tensor = process_image(image)
-            if img_tensor is None:
-                return
+            # Debug information
+            st.write("Debug: Image size:", image.size)
+            st.write("Debug: Model confidence threshold:", model.conf)
             
-            # Run inference
-            st.write("Debug: Running model inference")
-            results = model(img_tensor)[0]
-            st.write("Debug: Number of detections:", len(results[0].boxes))
+            # Run inference directly on the image
+            results = model(image, conf=0.25)  # Set explicit confidence threshold
             
-            # Process detections
-            img_with_bboxes, confidence_scores, pred_mask, detection_stats = draw_bboxes_and_masks(image, results[0])
-            st.write("Debug: Confidence scores:", confidence_scores)
+            # Debug information about results
+            st.write("Debug: Results type:", type(results))
+            st.write("Debug: Number of results:", len(results))
             
-            if len(confidence_scores) > 0:
-                with tab1:
-                    st.markdown("### 📊 Analysis Results")
+            if len(results) > 0:
+                result = results[0]  # Get first result
+                st.write("Debug: Number of detections:", len(result.boxes))
+                
+                # Process detections with error handling
+                try:
+                    img_with_bboxes, confidence_scores, pred_mask, detection_stats = draw_bboxes_and_masks(image, result)
                     
-                    # Show metrics
-                    metrics = calculate_metrics(pred_mask)
-                    if metrics:
-                        create_metrics_dashboard(metrics)
+                    # Debug information about detections
+                    st.write("Debug: Confidence scores:", confidence_scores)
+                    st.write("Debug: Detection stats:", detection_stats)
                     
-                    # Show detection statistics
-                    if detection_stats:
-                        st.markdown("### 📋 Detection Details")
-                        df = pd.DataFrame(detection_stats)
-                        st.dataframe(df)
+                    with tab1:
+                        st.markdown("### 📊 Analysis Results")
                         
-                        # Show confidence distribution
-                        st.markdown("### 📈 Confidence Distribution")
-                        conf_fig = create_confidence_plot(confidence_scores)
-                        if conf_fig:
-                            st.plotly_chart(conf_fig, use_container_width=True)
-                
-                with tab2:
-                    st.markdown("### 🎯 Segmentation Results")
-                    col1, col2 = st.columns(2)
+                        if len(confidence_scores) > 0:
+                            # Show metrics
+                            metrics = calculate_metrics(pred_mask)
+                            if metrics:
+                                create_metrics_dashboard(metrics)
+                            
+                            # Show detection statistics
+                            if detection_stats:
+                                st.markdown("### 📋 Detection Details")
+                                df = pd.DataFrame(detection_stats)
+                                st.dataframe(df)
+                                
+                                # Show confidence distribution
+                                st.markdown("### 📈 Confidence Distribution")
+                                conf_fig = create_confidence_plot(confidence_scores)
+                                if conf_fig:
+                                    st.plotly_chart(conf_fig, use_container_width=True)
+                        else:
+                            st.warning("No confident detections found. Trying adjusting the confidence threshold.")
                     
-                    with col1:
-                        st.markdown("#### Original Detection")
-                        st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
+                    with tab2:
+                        st.markdown("### 🎯 Segmentation Results")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("#### Original Image")
+                            st.image(image, caption='Original Image', use_column_width=True)
+                        
+                        with col2:
+                            st.markdown("#### Detection Results")
+                            if len(confidence_scores) > 0:
+                                st.image(img_with_bboxes, caption='Detected Regions', use_column_width=True)
+                            else:
+                                st.warning("No detections to display")
                     
-                    with col2:
-                        st.markdown("#### Segmentation Overlay")
+                    with tab3:
+                        st.markdown("### 📈 3D Visualization")
                         if np.any(pred_mask):
-                            mask_overlay = np.zeros_like(img_with_bboxes)
-                            mask_overlay[pred_mask == 255] = (0, 255, 0)
-                            combined_img = cv2.addWeighted(img_with_bboxes, 0.7, mask_overlay, 0.3, 0)
-                            st.image(combined_img, caption='Segmentation Mask Overlay', use_column_width=True)
+                            surface_plot = create_3d_surface_plot(pred_mask)
+                            if surface_plot:
+                                st.plotly_chart(surface_plot, use_container_width=True)
+                        else:
+                            st.warning("No segmentation mask available for 3D visualization")
                 
-                with tab3:
-                    st.markdown("### 📈 3D Visualization")
-                    if np.any(pred_mask):
-                        surface_plot = create_3d_surface_plot(pred_mask)
-                        if surface_plot:
-                            st.plotly_chart(surface_plot, use_container_width=True)
-                    else:
-                        st.warning("⚠️ No mask data available for 3D visualization")
+                except Exception as e:
+                    st.error(f"Error processing detections: {str(e)}")
+                    st.write("Debug: Detection processing error details:", str(e))
             else:
-                st.warning("⚠️ No confident detections found. Try adjusting the confidence threshold or using a different image.")
+                st.warning("No detections found in the image")
+                
+                # Show original image anyway
+                st.markdown("### Original Image")
+                st.image(image, caption='Original Image', use_column_width=True)
                 
     except Exception as e:
-        st.error(f"❌ Error during visualization: {str(e)}")
+        st.error(f"Error during visualization: {str(e)}")
         st.write("Debug: Full error details:", str(e))
+        
+        # Show original image in case of error
+        st.markdown("### Original Image")
+        st.image(image, caption='Original Image', use_column_width=True)
 
+# Update the draw_bboxes_and_masks function to handle empty results
+def draw_bboxes_and_masks(image, results):
+    """Draw bounding boxes and masks with enhanced error handling"""
+    try:
+        img = np.array(image.copy())
+        confidence_scores = []
+        pred_mask = np.zeros((640, 640), dtype=np.uint8)
+        detection_stats = []
+        
+        # Debug information
+        st.write("Debug: Processing detections")
+        
+        if hasattr(results, 'boxes') and results.boxes is not None:
+            boxes = results.boxes
+            st.write(f"Debug: Number of boxes: {len(boxes)}")
+            
+            if len(boxes) > 0:
+                for i, box in enumerate(boxes):
+                    try:
+                        # Get box coordinates
+                        coords = box.xyxy[0].cpu().numpy()
+                        x1, y1, x2, y2 = map(int, coords)
+                        
+                        # Get confidence and class
+                        conf = float(box.conf[0])
+                        cls_id = int(box.cls[0])
+                        
+                        # Debug information
+                        st.write(f"Debug: Processing detection {i}: conf={conf}, class={cls_id}")
+                        
+                        if conf > model.conf:  # Use model's confidence threshold
+                            confidence_scores.append(conf)
+                            
+                            # Draw bounding box
+                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            
+                            # Add label
+                            label = f"{CLASS_NAMES[cls_id]} {conf:.2f}"
+                            cv2.putText(img, label, (x1, y1-10), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                            
+                            # Add detection stats
+                            detection_stats.append({
+                                'Class': CLASS_NAMES[cls_id],
+                                'Confidence': conf,
+                                'Box Area': (x2-x1)*(y2-y1)
+                            })
+                    except Exception as e:
+                        st.write(f"Debug: Error processing detection {i}: {str(e)}")
+        
+        return img, confidence_scores, pred_mask, detection_stats
+        
+    except Exception as e:
+        st.error(f"Error in detection processing: {str(e)}")
+        return image, [], np.zeros((640, 640), dtype=np.uint8), []
 def main():
     # Sidebar
     with st.sidebar:
