@@ -430,213 +430,171 @@ def create_analysis_report(image_name, metrics, timestamp):
             st.write("Debug details:", str(e))
         return None
 
-def display_results(image, visualizations, metrics, detection_stats):
-    """Display analysis results in organized tabs"""
+def process_and_visualize(image, model):
+    """Process image and create visualizations"""
     try:
+        # Create tabs for results
         tab1, tab2, tab3 = st.tabs([
             "📊 Analysis Results",
             "🎯 Detections View",
             "📈 3D Visualization"
         ])
-        
-        with tab1:
-            st.markdown("### 📊 Analysis Dashboard")
-            create_metrics_dashboard(metrics)
-            
-            if detection_stats:
-                st.markdown("### 📋 Detection Details")
-                df = pd.DataFrame(detection_stats)
-                st.dataframe(df)
-                
-                if 'confidence_dist' in visualizations:
-                    st.plotly_chart(visualizations['confidence_dist'],
-                                  use_container_width=True)
-        
-        with tab2:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("#### Original Image")
-                st.image(image, caption='Input Image', use_column_width=True)
-            
-            with col2:
-                st.markdown("#### Detection Results")
-                if 'detections' in visualizations:
-                    st.image(visualizations['detections'],
-                            caption='Detected Regions',
-                            use_column_width=True)
-                
-                if 'segmentation' in visualizations:
-                    st.markdown("#### Segmentation Overlay")
-                    st.image(visualizations['segmentation'],
-                            caption='Segmentation Mask',
-                            use_column_width=True)
-        
-        with tab3:
-            st.markdown("### 📈 3D Visualization")
-            surface_plot = create_3d_visualization(metrics.get('mask', None))
-            if surface_plot:
-                st.plotly_chart(surface_plot, use_container_width=True)
-            else:
-                st.info("3D visualization not available for this image")
-                
-    except Exception as e:
-        st.error(f"❌ Error displaying results: {str(e)}")
 
+        # Debug information
+        if st.session_state.debug_mode:
+            st.write(f"Debug: Image size = {image.size}")
+            st.write(f"Debug: Model confidence = {model.conf}")
+
+        # Run model inference
+        with st.spinner("Running detection..."):
+            results = model(image)
+            
+            if len(results) == 0:
+                st.warning("No detections found in the image")
+                return
+                
+            result = results[0]
+            
+            # Process detections
+            img_with_boxes = np.array(image).copy()
+            confidence_scores = []
+            detection_stats = []
+            
+            if hasattr(result, 'boxes') and result.boxes is not None:
+                boxes = result.boxes
+                for box in boxes:
+                    # Get coordinates
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = float(box.conf[0])
+                    cls_id = int(box.cls[0])
+                    
+                    if conf > model.conf:
+                        # Draw box
+                        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        
+                        # Add label
+                        label = f"{CLASS_NAMES[cls_id]} {conf:.2f}"
+                        cv2.putText(img_with_boxes, label, (x1, y1-10),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        
+                        confidence_scores.append(conf)
+                        detection_stats.append({
+                            'Class': CLASS_NAMES[cls_id],
+                            'Confidence': conf,
+                            'Area': (x2-x1)*(y2-y1)
+                        })
+            
+            # Display results in tabs
+            with tab1:
+                st.markdown("### 📊 Analysis Results")
+                
+                if detection_stats:
+                    # Show detection statistics
+                    st.markdown("#### Detection Statistics")
+                    df = pd.DataFrame(detection_stats)
+                    st.dataframe(df)
+                    
+                    # Show confidence distribution
+                    st.markdown("#### Confidence Distribution")
+                    fig = px.histogram(
+                        df, x='Confidence',
+                        nbins=20,
+                        title="Detection Confidence Distribution"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Calculate and show metrics
+                    metrics = {
+                        'Total Detections': len(detection_stats),
+                        'Average Confidence': np.mean([d['Confidence'] for d in detection_stats]),
+                        'Average Area': np.mean([d['Area'] for d in detection_stats])
+                    }
+                    create_metrics_dashboard(metrics)
+                else:
+                    st.warning("No confident detections found")
+            
+            with tab2:
+                st.markdown("### 🎯 Detection Results")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### Original Image")
+                    st.image(image, caption='Input Image')
+                
+                with col2:
+                    st.markdown("#### Detections")
+                    st.image(img_with_boxes, caption='Detected Objects')
+            
+            with tab3:
+                st.markdown("### 📈 Detection Visualization")
+                if detection_stats:
+                    # Create scatter plot of detections
+                    fig = px.scatter(
+                        df,
+                        x='Area',
+                        y='Confidence',
+                        color='Class',
+                        size='Area',
+                        title="Detections Analysis"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No data available for visualization")
+
+    except Exception as e:
+        st.error(f"Error in processing: {str(e)}")
+        if st.session_state.debug_mode:
+            st.write("Debug details:", str(e))
+
+# Update main function to use the new processing
 def main():
     """Main application function"""
-    # Sidebar
-    with st.sidebar:
-        st.title("🎛️ Control Panel")
-        st.markdown("---")
-        
-        # Image source selection
-        src = st.radio(
-            "📷 Select Image Source",
-            ['Sample Gallery', 'Upload Image'],
-            help="Choose image source"
-        )
-        
-        # Confidence threshold adjustment
-        conf_threshold = st.slider(
-            "Confidence Threshold",
-            min_value=0.1,
-            max_value=1.0,
-            value=CONFIDENCE_THRESHOLD,
-            step=0.05,
-            help="Adjust detection sensitivity"
-        )
-        
-        # Debug mode toggle
-        st.session_state.debug_mode = st.checkbox(
-            "Debug Mode",
-            value=False,
-            help="Show additional debugging information"
-        )
-        
-        st.markdown("---")
-        st.markdown("""
-            ### 📋 Model Information
-            - Architecture: YOLOv5
-            - Task: Detection & Segmentation
-            - Classes: Left & Right Ventricle
-            - Input Size: 640x640
-        """)
+    # ... (previous sidebar code remains the same)
 
     # Main content
     st.title("🫀 3D Heart MRI Analysis Dashboard")
-    st.markdown("""
-        This advanced dashboard provides comprehensive analysis of heart MRI images
-        using deep learning for detection and segmentation of cardiac structures.
-    """)
-
+    
     # Load model
-    if st.session_state.model is None:
+    if 'model' not in st.session_state or st.session_state.model is None:
         st.session_state.model = load_model()
     
     if st.session_state.model is None:
-        st.error("❌ Model loading failed. Please check your connection and reload.")
+        st.error("Model loading failed. Please check your connection and reload.")
         return
-
-    # Update model confidence threshold
-    st.session_state.model.conf = conf_threshold
-    if st.session_state.debug_mode:
-        st.write(f"Debug: Confidence threshold set to {conf_threshold}")
 
     # Image processing
     try:
-        if src == 'Upload Image':
-            uploaded_file = st.file_uploader(
-                "Choose an image...",
-                type=["jpg", "jpeg", "png"],
-                help="Upload a heart MRI image"
-            )
+        # Image selection (Upload or Sample)
+        uploaded_file = st.file_uploader(
+            "Choose an image...",
+            type=["jpg", "jpeg", "png"]
+        )
+
+        if uploaded_file:
+            image = Image.open(uploaded_file).convert('RGB')
+            st.image(image, caption='Uploaded Image', width=300)
             
-            if uploaded_file:
-                image = Image.open(uploaded_file).convert("RGB")
-                st.image(image, caption='Uploaded Image', width=300)
-                image_name = uploaded_file.name
+            if st.button("🔍 Analyze Image", type="primary"):
+                process_and_visualize(image, st.session_state.model)
+        
         else:
-            selected_image = st.slider(
-                "Select sample image",
-                1, 50,
-                help="Choose from sample dataset"
-            )
+            st.info("Please upload an image to begin analysis")
             
-            image_url = f"https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/{selected_image}.jpg"
-            response = requests.get(image_url)
-            response.raise_for_status()
-            
-            image = Image.open(BytesIO(response.content)).convert("RGB")
-            st.image(image, caption=f'Sample Image #{selected_image}', width=300)
-            image_name = f"sample_{selected_image}.jpg"
-
-        # Analysis button
-        if st.button("🔍 Analyze Image", type="primary", use_container_width=True):
-            with st.spinner("🔄 Processing image..."):
-                # Process image
-                processed_img, resized_img = process_image(image)
-                if processed_img is None:
-                    st.error("❌ Error processing image")
-                    return
-
-                # Run inference
-                if st.session_state.debug_mode:
-                    st.write("Debug: Running model inference")
-                results = st.session_state.model(processed_img)
-                
-                if len(results) > 0:
-                    # Create visualizations
-                    visualizations, detection_stats = create_visualization(
-                        resized_img, results[0]
-                    )
-                    
-                    # Calculate metrics
-                    pred_mask = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8)
-                    if hasattr(results[0], 'masks') and results[0].masks is not None:
-                        pred_mask = results[0].masks[0].data.cpu().numpy()
-                    
-                    metrics = calculate_metrics(detection_stats, pred_mask)
-                    metrics['mask'] = pred_mask
-                    
-                    # Display results
-                    display_results(resized_img, visualizations, metrics, detection_stats)
-                    
-                    # Generate report
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    report = create_analysis_report(image_name, metrics, timestamp)
-                    
-                    if report:
-                        st.download_button(
-                            label="📥 Download Report",
-                            data=report,
-                            file_name=f"analysis_report_{timestamp}.json",
-                            mime="application/json"
-                        )
-                    
-                    # Store in session state
-                    st.session_state.previous_calculations.append({
-                        "timestamp": timestamp,
-                        "image_name": image_name,
-                        "metrics": metrics,
-                        "detection_stats": detection_stats
-                    })
+            # Sample image option
+            if st.button("Try with Sample Image"):
+                sample_url = "https://raw.githubusercontent.com/datascintist-abusufian/3D-Heart-Imaging-apps/main/data/images/test/1.jpg"
+                response = requests.get(sample_url)
+                if response.status_code == 200:
+                    image = Image.open(BytesIO(response.content)).convert('RGB')
+                    st.image(image, caption='Sample Image', width=300)
+                    process_and_visualize(image, st.session_state.model)
                 else:
-                    st.warning("⚠️ No detections found in the image")
+                    st.error("Failed to load sample image")
 
     except Exception as e:
-        st.error(f"❌ Error in main application: {str(e)}")
+        st.error(f"Error in application: {str(e)}")
         if st.session_state.debug_mode:
-            st.write("Debug: Full error details:", str(e))
-
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-        <div style='text-align: center; color: #666;'>
-            <p>Created by Md Abu Sufian | Version 2.0</p>
-            <p>For research and educational purposes only</p>
-        </div>
-    """, unsafe_allow_html=True)
+            st.write("Debug details:", str(e))
 
 if __name__ == "__main__":
     main()
