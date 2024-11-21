@@ -21,7 +21,7 @@ from datetime import datetime
 MODEL_URL = "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/yolov5s.pt"
 MODEL_PATH = "yolov5s.pt"
 CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
-CONFIDENCE_THRESHOLD = 0.00  # Lowered threshold for testing
+CONFIDENCE_THRESHOLD = 0.25  # Lowered threshold for testing
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -84,10 +84,14 @@ def load_model():
                         f.write(chunk)
                 st.success("✅ Model downloaded successfully!")
 
-        with st.spinner("🔄 Loading model..."):
+       with st.spinner("🔄 Loading model..."):
             st.write("Debug: Initializing YOLO model")
             model = YOLO(model_path)
-            model.conf = CONFIDENCE_THRESHOLD  # Set confidence threshold
+            # Set model parameters
+            model.conf = CONFIDENCE_THRESHOLD
+            model.iou = 0.45  # Added IOU threshold
+            model.max_det = 100  # Maximum detections
+            model.verbose = False
             st.success("✅ Model loaded successfully!")
             return model
 
@@ -333,6 +337,10 @@ def process_and_visualize(image, model):
     """Process image and create visualizations"""
     try:
         with st.spinner("🔄 Processing image..."):
+            # Add debug information
+            st.write("Debug: Image size:", image.size)
+            st.write("Debug: Model confidence threshold:", model.conf)
+            
             # Create tabs
             tab1, tab2, tab3 = st.tabs([
                 "📊 Analysis Results", 
@@ -348,9 +356,11 @@ def process_and_visualize(image, model):
             # Run inference
             st.write("Debug: Running model inference")
             results = model(img_tensor)[0]
+            st.write("Debug: Number of detections:", len(results[0].boxes))
             
             # Process detections
-            img_with_bboxes, confidence_scores, pred_mask, detection_stats = draw_bboxes_and_masks(image, results)
+            img_with_bboxes, confidence_scores, pred_mask, detection_stats = draw_bboxes_and_masks(image, results[0])
+            st.write("Debug: Confidence scores:", confidence_scores)
             
             if len(confidence_scores) > 0:
                 with tab1:
@@ -425,7 +435,11 @@ def main():
             step=0.1,
             help="Adjust the confidence threshold for detections"
         )
-        
+        # Update model confidence threshold
+        if 'model' in st.session_state and st.session_state.model is not None:
+            st.session_state.model.conf = conf_threshold
+            st.write("Debug: Updated confidence threshold:", conf_threshold)
+            
         st.markdown("---")
         st.markdown("""
         ### 📋 Information
