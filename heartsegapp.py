@@ -296,7 +296,7 @@ def calculate_metrics(detections, mask):
         return {}
 
 def create_metrics_dashboard(metrics):
-    """Create interactive metrics dashboard"""
+    """Create interactive metrics dashboard with fixed formatting"""
     try:
         if not metrics:
             return
@@ -315,11 +315,19 @@ def create_metrics_dashboard(metrics):
         
         # Display metrics in cards
         for i, (metric_name, value) in enumerate(metrics.items()):
-            if metric_name == 'Class Distribution':
-                continue  # Handle separately
+            if metric_name == 'Class Distribution' or metric_name == 'mask':
+                continue  # Skip these special metrics
                 
             with cols[i % 3]:
                 icon, color = metric_styles.get(metric_name, ('📌', '#666666'))
+                # Format value based on type
+                if isinstance(value, (int, np.integer)):
+                    formatted_value = f"{value:,}"
+                elif isinstance(value, (float, np.floating)):
+                    formatted_value = f"{value:.2f}"
+                else:
+                    formatted_value = str(value)
+                
                 st.markdown(f"""
                     <div style='
                         background-color: {color}22;
@@ -332,7 +340,7 @@ def create_metrics_dashboard(metrics):
                             {icon} {metric_name}
                         </h3>
                         <p class='metric-value' style='color: {color};'>
-                            {value:.2f if isinstance(value, float) else value}
+                            {formatted_value}
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
@@ -350,7 +358,9 @@ def create_metrics_dashboard(metrics):
             
     except Exception as e:
         st.error(f"❌ Error creating dashboard: {str(e)}")
-
+        if st.session_state.debug_mode:
+            st.write("Debug details:", str(e))
+            
 def create_3d_visualization(mask):
     """Create 3D surface plot of segmentation mask"""
     try:
