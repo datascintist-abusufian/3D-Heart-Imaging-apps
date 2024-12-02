@@ -534,8 +534,7 @@ def main():
         st.markdown("---")
         st.markdown("""
             ### 📋 Information
-            - Model: YOLOv8-Segmentation
-            - Input Size: 640x640
+            - Model: AI model-Segmentation
             - Task: Cardiac Structure Segmentation
         """)
     
