@@ -35,7 +35,10 @@ import pkg_resources as pkg
 import torch
 import torchvision
 import yaml
-from ultralytics.yolo.utils.checks import check_requirements
+try:
+    from ultralytics.utils.checks import check_requirements  # ultralytics >= 8.0.136
+except ImportError:
+    from ultralytics.yolo.utils.checks import check_requirements  # older ultralytics
 
 from utils import TryExcept, emojis
 from utils.downloads import curl_download, gsutil_getsize
