@@ -1437,6 +1437,7 @@ def main():
             ]
             
             cols = st.columns(4)
+            selected_image = None
             for idx, (col, url) in enumerate(zip(cols, sample_urls)):
                 with col:
                     try:
@@ -1446,9 +1447,13 @@ def main():
                         st.image(image, caption=f"Sample {idx+1}", use_container_width=True)
                         
                         if st.button(f"Analyze #{idx+1}", key=f"sample_{idx}"):
-                            process_and_visualize_enhanced(image, st.session_state.model)
+                            selected_image = image
                     except Exception as e:
                         st.error(f"Error loading sample {idx+1}")
+            
+            # Show results full-width, not inside the narrow sample column
+            if selected_image is not None:
+                process_and_visualize_enhanced(selected_image, st.session_state.model)
         
         else:  # URL
             url = st.text_input("Enter Image URL:", placeholder="https://example.com/image.jpg")
