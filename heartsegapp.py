@@ -16,6 +16,7 @@ import pandas as pd
 from datetime import datetime
 import json
 import base64
+import zipfile
 from scipy import ndimage
 from scipy.stats import skew, kurtosis
 import warnings
@@ -215,53 +216,76 @@ def enhance_image(image_array):
 # ============================================================================
 # MODEL LOADING WITH FALLBACK
 # ============================================================================
-@st.cache_resource
-def load_model():
-    """Load YOLO segmentation model with progress tracking and fallback"""
+def _is_valid_model_file(path):
+    """A .pt checkpoint is a zip archive; a cut-off download is not."""
+    return os.path.exists(path) and os.path.getsize(path) > 1_000_000 and zipfile.is_zipfile(path)
+
+
+def _download_model():
+    """Download to a temp file and only move it into place once it is complete."""
+    tmp_path = MODEL_PATH + ".part"
+    progress_bar = st.progress(0)
+    status_text = st.empty()
     try:
-        os.makedirs('models', exist_ok=True)
-        
-        if not os.path.exists(MODEL_PATH):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            with st.spinner("📥 Downloading segmentation model..."):
-                response = requests.get(MODEL_URL, stream=True)
+        with st.spinner("📥 Downloading segmentation model..."):
+            with requests.get(MODEL_URL, stream=True, timeout=60) as response:
                 response.raise_for_status()
-                
                 total_size = int(response.headers.get('content-length', 0))
-                block_size = 8192
                 downloaded = 0
-                
-                with open(MODEL_PATH, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=block_size):
+                with open(tmp_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total_size > 0:
                             progress = downloaded / total_size
                             progress_bar.progress(min(progress, 1.0))
                             status_text.text(f"Downloading: {progress*100:.1f}%")
-                
-                progress_bar.empty()
-                status_text.empty()
-                st.success("✅ Model downloaded successfully!")
-        
+        if total_size and downloaded != total_size:
+            raise IOError(f"Incomplete download ({downloaded} of {total_size} bytes)")
+        if not _is_valid_model_file(tmp_path):
+            raise IOError("Downloaded model file is not a valid checkpoint")
+        os.replace(tmp_path, MODEL_PATH)
+    finally:
+        progress_bar.empty()
+        status_text.empty()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+@st.cache_resource(show_spinner=False)
+def load_model():
+    """Load the YOLO segmentation model, re-downloading it if the file is missing or corrupt.
+
+    Raises on failure so that a failed load is not cached by st.cache_resource.
+    """
+    os.makedirs('models', exist_ok=True)
+
+    if not _is_valid_model_file(MODEL_PATH):
+        if os.path.exists(MODEL_PATH):
+            os.remove(MODEL_PATH)  # remove a corrupt/partial file left by an earlier run
+        _download_model()
+
+    try:
         with st.spinner("🔄 Loading model..."):
             model = YOLO(MODEL_PATH)
-            model.conf = CONFIDENCE_THRESHOLD
-            model.task = 'segment'
-            return model
-            
+    except Exception:
+        # File passed the quick check but torch still can't read it: fetch it again once.
+        os.remove(MODEL_PATH)
+        _download_model()
+        with st.spinner("🔄 Loading model..."):
+            model = YOLO(MODEL_PATH)
+
+    model.conf = CONFIDENCE_THRESHOLD
+    model.task = 'segment'
+    return model
+
+
+def get_model():
+    """Return the model, or None (with an error shown) if it could not be loaded."""
+    try:
+        return load_model()
     except Exception as e:
-        st.error(f"❌ Error loading model: {str(e)}")
-        st.info("💡 Trying to load from cache...")
-        try:
-            # Try to load from local cache if available
-            if os.path.exists(MODEL_PATH):
-                model = YOLO(MODEL_PATH)
-                return model
-        except:
-            pass
+        st.error(f"❌ Error loading model: {e}")
         return None
 
 # ============================================================================
@@ -1255,10 +1279,10 @@ def main():
     
     # Load model
     if st.session_state.model is None:
-        st.session_state.model = load_model()
+        st.session_state.model = get_model()
     
     if st.session_state.model is None:
-        st.error("❌ Model loading failed. Please check your connection.")
+        st.error("❌ Model loading failed. Please reload the page to retry.")
         return
     
     # Sidebar
