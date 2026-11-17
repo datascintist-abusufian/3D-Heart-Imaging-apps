@@ -1428,77 +1428,33 @@ def main():
         elif src == 'Sample Images':
             st.markdown("### 📸 Sample Images")
             
-            # Sample image grid with better layout
-sample_urls = [
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/1.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/2.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/3.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/4.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/5.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/6.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/7.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/8.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/9.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/10.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/11.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/12.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/13.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/14.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/15.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/16.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/17.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/18.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/19.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/20.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/21.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/22.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/23.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/24.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/25.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/26.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/27.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/28.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/29.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/30.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/31.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/32.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/33.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/34.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/35.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/36.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/37.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/38.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/39.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/40.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/41.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/42.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/43.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/44.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/45.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/46.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/47.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/48.jpg",
-    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/49.jpg",
-]
+            # Sample images 1-49 are stored in the repo, so read them from disk (no downloads)
+            sample_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "images", "test")
+            sample_files = [os.path.join(sample_dir, f"{i}.jpg") for i in range(1, 50)]
+            sample_files = [f for f in sample_files if os.path.exists(f)]
+            st.caption(f"{len(sample_files)} cardiac MRI test images. Click Analyze under any image.")
             
-            cols = st.columns(4)
+            results_area = st.container()  # results appear here, above the image grid
             selected_image = None
-            for idx, (col, url) in enumerate(zip(cols, sample_urls)):
-                with col:
-                    try:
-                        response = requests.get(url, timeout=5)
-                        response.raise_for_status()
-                        image = Image.open(BytesIO(response.content)).convert("RGB")
-                        st.image(image, caption=f"Sample {idx+1}", use_container_width=True)
-                        
-                        if st.button(f"Analyze #{idx+1}", key=f"sample_{idx}"):
-                            selected_image = image
-                    except Exception as e:
-                        st.error(f"Error loading sample {idx+1}")
+            n_cols = 4
+            for row_start in range(0, len(sample_files), n_cols):
+                cols = st.columns(n_cols)
+                for col, path in zip(cols, sample_files[row_start:row_start + n_cols]):
+                    idx = sample_files.index(path)
+                    with col:
+                        try:
+                            image = Image.open(path).convert("RGB")
+                            st.image(image, caption=f"Sample {idx+1}", use_container_width=True)
+                            if st.button(f"Analyze #{idx+1}", key=f"sample_{idx}"):
+                                selected_image = image
+                        except Exception as e:
+                            st.error(f"Error loading sample {idx+1}")
             
-            # Show results full-width, not inside the narrow sample column
+            # Show results full-width above the grid, not inside a narrow sample column
             if selected_image is not None:
-                process_and_visualize_enhanced(selected_image, st.session_state.model)
+                with results_area:
+                    process_and_visualize_enhanced(selected_image, st.session_state.model)
+                    st.markdown("---")
         
         else:  # URL
             url = st.text_input("Enter Image URL:", placeholder="https://example.com/image.jpg")
