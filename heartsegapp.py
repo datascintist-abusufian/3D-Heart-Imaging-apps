@@ -1429,12 +1429,57 @@ def main():
             st.markdown("### 📸 Sample Images")
             
             # Sample image grid with better layout
-            sample_urls = [
-                "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/1.jpg",
-                "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/2.jpg",
-                "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/3.jpg",
-                "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/4.jpg"
-            ]
+sample_urls = [
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/1.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/2.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/3.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/4.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/5.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/6.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/7.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/8.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/9.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/10.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/11.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/12.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/13.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/14.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/15.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/16.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/17.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/18.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/19.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/20.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/21.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/22.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/23.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/24.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/25.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/26.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/27.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/28.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/29.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/30.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/31.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/32.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/33.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/34.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/35.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/36.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/37.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/38.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/39.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/40.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/41.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/42.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/43.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/44.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/45.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/46.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/47.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/48.jpg",
+    "https://github.com/datascintist-abusufian/3D-Heart-Imaging-apps/raw/main/data/images/test/49.jpg",
+]
             
             cols = st.columns(4)
             selected_image = None
