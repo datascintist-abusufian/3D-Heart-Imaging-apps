@@ -1,8 +1,8 @@
 import streamlit as st
 import torch
-from ultralytics import YOLO
 from PIL import Image
 import os
+import sys
 import requests
 from torchvision.transforms import transforms
 from io import BytesIO
@@ -16,7 +16,6 @@ import pandas as pd
 from datetime import datetime
 import json
 import base64
-import zipfile
 from scipy import ndimage
 from scipy.stats import skew, kurtosis
 import warnings
@@ -29,11 +28,20 @@ from collections import Counter
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
 # ============================================================================
-MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8x-seg.pt"
-MODEL_PATH = "models/yolov8x-seg.pt"
-CLASS_NAMES = {0: 'Left Ventricle', 1: 'Right Ventricle'}
+# Heart model trained in this repo (YOLOv5s, 3 classes, heart-segmentation-2 dataset)
+HEART_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "heart_1st", "weights", "best.pt")
+CLASS_NAMES = {0: 'Left Ventricle', 1: 'Myocardium', 2: 'Right Ventricle'}
 CONFIDENCE_THRESHOLD = 0.25
-IMAGE_SIZE = 640
+STRUCTURE_COLORS = {'Left Ventricle': '#00a6ed', 'Myocardium': '#f5a623', 'Right Ventricle': '#ff6b6b'}
+
+
+def _structure_color(name, alpha=None):
+    hex_color = STRUCTURE_COLORS.get(name, '#7f7f7f')
+    if alpha is None:
+        return hex_color
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return f'rgba({r},{g},{b},{alpha})'
+IMAGE_SIZE = 416  # training image size of the heart model
 
 # Clinical reference ranges
 CLINICAL_REFERENCES = {
@@ -216,68 +224,119 @@ def enhance_image(image_array):
 # ============================================================================
 # MODEL LOADING WITH FALLBACK
 # ============================================================================
-def _is_valid_model_file(path):
-    """A .pt checkpoint is a zip archive; a cut-off download is not."""
-    return os.path.exists(path) and os.path.getsize(path) > 1_000_000 and zipfile.is_zipfile(path)
+class _Container:
+    """Minimal stand-in for ultralytics' Masks/Boxes: exposes .data and len()."""
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
 
 
-def _download_model():
-    """Download to a temp file and only move it into place once it is complete."""
-    tmp_path = MODEL_PATH + ".part"
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    try:
-        with st.spinner("📥 Downloading segmentation model..."):
-            with requests.get(MODEL_URL, stream=True, timeout=60) as response:
-                response.raise_for_status()
-                total_size = int(response.headers.get('content-length', 0))
-                downloaded = 0
-                with open(tmp_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=1024 * 1024):
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size > 0:
-                            progress = downloaded / total_size
-                            progress_bar.progress(min(progress, 1.0))
-                            status_text.text(f"Downloading: {progress*100:.1f}%")
-        if total_size and downloaded != total_size:
-            raise IOError(f"Incomplete download ({downloaded} of {total_size} bytes)")
-        if not _is_valid_model_file(tmp_path):
-            raise IOError("Downloaded model file is not a valid checkpoint")
-        os.replace(tmp_path, MODEL_PATH)
-    finally:
-        progress_bar.empty()
-        status_text.empty()
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+class HeartResult:
+    """Result object with the same .masks.data / .boxes.data layout the rest of the app expects."""
+    def __init__(self, masks, boxes, orig_img):
+        self.masks = _Container(torch.from_numpy(masks)) if len(masks) else None
+        self.boxes = _Container(torch.from_numpy(boxes))
+        self.orig_img = orig_img
+
+
+def _ellipse_in_box(shape, x1, y1, x2, y2):
+    mask = np.zeros(shape, dtype=np.uint8)
+    center = ((x1 + x2) // 2, (y1 + y2) // 2)
+    axes = (max((x2 - x1) // 2, 1), max((y2 - y1) // 2, 1))
+    cv2.ellipse(mask, center, axes, 0, 0, 360, 1, -1)
+    return mask.astype(bool)
+
+
+def _cavity_mask(gray, x1, y1, x2, y2):
+    """Blood pool inside a detected box: bright pixels (Otsu), largest component, holes filled."""
+    full = np.zeros(gray.shape, dtype=bool)
+    crop = gray[y1:y2, x1:x2]
+    if crop.size < 16 or crop.max() == crop.min():
+        return _ellipse_in_box(gray.shape, x1, y1, x2, y2)
+    bright = crop > filters.threshold_otsu(crop)
+    bright = morphology.binary_opening(bright, morphology.disk(1))
+    labeled = measure.label(bright)
+    if labeled.max() == 0:
+        return _ellipse_in_box(gray.shape, x1, y1, x2, y2)
+    largest = max(measure.regionprops(labeled), key=lambda r: r.area).label
+    region = ndimage.binary_fill_holes(labeled == largest)
+    if region.sum() < 0.1 * crop.size:  # too small to be the cavity: fall back to the box shape
+        return _ellipse_in_box(gray.shape, x1, y1, x2, y2)
+    full[y1:y2, x1:x2] = region
+    return full
+
+
+class HeartSegmenter:
+    """Runs the repo's trained YOLOv5 heart detector, then outlines each structure inside its box.
+
+    The model detects bounding boxes for the left ventricle, myocardium and right ventricle.
+    Outlines are derived from image intensity inside each box: ventricles = bright blood pool,
+    myocardium = ring between its box and the left-ventricle cavity.
+    """
+    def __init__(self, detector):
+        self.detector = detector
+        self.conf = CONFIDENCE_THRESHOLD
+        self.task = 'segment'
+
+    def __call__(self, image, **kwargs):
+        img = np.array(image.convert("RGB")) if isinstance(image, Image.Image) else np.asarray(image)
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        self.detector.conf = self.conf
+        dets = self.detector(img, size=IMAGE_SIZE).xyxy[0].cpu().numpy()
+
+        # Keep the most confident detection per class (one of each structure per slice)
+        best = {}
+        for d in dets:
+            cls = int(d[5])
+            if cls not in best or d[4] > best[cls][4]:
+                best[cls] = d
+
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        h, w = gray.shape
+        masks, boxes, cavity = [], [], {}
+        for cls in sorted(best, key=lambda c: c == 1):  # cavities first, myocardium last
+            x1, y1, x2, y2, conf, _ = best[cls]
+            x1, y1 = max(int(x1), 0), max(int(y1), 0)
+            x2, y2 = min(int(np.ceil(x2)), w), min(int(np.ceil(y2)), h)
+            if x2 <= x1 or y2 <= y1:
+                continue
+            if cls == 1:  # myocardium: ring around the LV cavity
+                mask = _ellipse_in_box(gray.shape, x1, y1, x2, y2)
+                if 0 in cavity:
+                    mask &= ~morphology.binary_dilation(cavity[0], morphology.disk(1))
+                else:
+                    crop = gray[y1:y2, x1:x2]
+                    if crop.max() > crop.min():
+                        inner = np.zeros_like(mask)
+                        inner[y1:y2, x1:x2] = crop > filters.threshold_otsu(crop)
+                        mask &= ~inner
+            else:
+                mask = _cavity_mask(gray, x1, y1, x2, y2)
+                cavity[cls] = mask
+            masks.append(mask.astype(np.float32))
+            boxes.append([x1, y1, x2, y2, float(conf), cls])
+
+        masks = np.stack(masks) if masks else np.zeros((0, h, w), dtype=np.float32)
+        boxes = np.array(boxes, dtype=np.float32).reshape(-1, 6)
+        return [HeartResult(masks, boxes, img)]
 
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    """Load the YOLO segmentation model, re-downloading it if the file is missing or corrupt.
+    """Load the trained heart model from the repo (no download needed).
 
     Raises on failure so that a failed load is not cached by st.cache_resource.
     """
-    os.makedirs('models', exist_ok=True)
-
-    if not _is_valid_model_file(MODEL_PATH):
-        if os.path.exists(MODEL_PATH):
-            os.remove(MODEL_PATH)  # remove a corrupt/partial file left by an earlier run
-        _download_model()
-
-    try:
-        with st.spinner("🔄 Loading model..."):
-            model = YOLO(MODEL_PATH)
-    except Exception:
-        # File passed the quick check but torch still can't read it: fetch it again once.
-        os.remove(MODEL_PATH)
-        _download_model()
-        with st.spinner("🔄 Loading model..."):
-            model = YOLO(MODEL_PATH)
-
-    model.conf = CONFIDENCE_THRESHOLD
-    model.task = 'segment'
-    return model
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if app_dir not in sys.path:
+        sys.path.insert(0, app_dir)  # make the bundled YOLOv5 'models'/'utils' packages importable
+    from models.common import AutoShape, DetectMultiBackend  # YOLOv5 code bundled in this repo
+    with st.spinner("🔄 Loading heart model..."):
+        detector = AutoShape(DetectMultiBackend(HEART_MODEL_PATH, device=torch.device('cpu'), fuse=True))
+    return HeartSegmenter(detector)
 
 
 def get_model():
@@ -374,7 +433,7 @@ def traditional_segmentation(image):
                 
                 # Create bounding box
                 minr, minc, maxr, maxc = prop.bbox
-                box = np.array([minc, minr, maxc, maxr, 0.5, i])  # x1, y1, x2, y2, conf, class
+                box = np.array([minc, minr, maxc, maxr, 0.5, 100 + i])  # x1, y1, x2, y2, conf, unnamed class
                 boxes.append(box)
             
             # Create result object
@@ -407,9 +466,11 @@ def process_segmentation_results(result, original_img, method_used):
         
         # Handle different result types
         if hasattr(result, 'masks') and result.masks is not None:
-            # Standard YOLO result
-            masks = result.masks.data.cpu().numpy()
-            boxes = result.boxes.data.cpu().numpy()
+            # Model result (torch tensors) or traditional result (numpy arrays)
+            masks = result.masks.data
+            boxes = result.boxes.data
+            masks = masks.cpu().numpy() if hasattr(masks, 'cpu') else np.asarray(masks)
+            boxes = boxes.cpu().numpy() if hasattr(boxes, 'cpu') else np.asarray(boxes)
         elif hasattr(result, 'masks') and hasattr(result.masks, 'data'):
             # Traditional result
             masks = result.masks.data
@@ -424,6 +485,7 @@ def process_segmentation_results(result, original_img, method_used):
             
         colors = {
             'Left Ventricle': [0, 255, 0],
+            'Myocardium': [255, 200, 0],
             'Right Ventricle': [255, 0, 0]
         }
         
@@ -457,7 +519,8 @@ def process_segmentation_results(result, original_img, method_used):
                 # Calculate metrics
                 if np.sum(mask) > 0:
                     area = np.sum(mask)
-                    perimeter = cv2.arcLength(mask.astype(np.uint8), True)
+                    contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    perimeter = sum(cv2.arcLength(c, True) for c in contours)
                     circularity = 4 * np.pi * area / (perimeter ** 2) if perimeter > 0 else 0
                     
                     moments = cv2.moments(mask.astype(np.uint8))
@@ -594,6 +657,7 @@ def create_enhanced_metrics_dashboard(stats, masks):
             if len(metrics_by_class) >= 2:
                 categories = ['Area', 'Circularity', 'Confidence', 'Compactness']
                 fig_radar = go.Figure()
+                radar_max = 0
                 
                 for ventricle, metrics in metrics_by_class.items():
                     values = [
@@ -602,21 +666,22 @@ def create_enhanced_metrics_dashboard(stats, masks):
                         metrics['confidence'],
                         metrics['circularity'] * 10
                     ]
+                    radar_max = max(radar_max, max(values))
                     
                     fig_radar.add_trace(go.Scatterpolar(
                         r=values,
                         theta=categories,
                         fill='toself',
                         name=ventricle,
-                        line=dict(color='#00a6ed' if ventricle == 'Left Ventricle' else '#ff6b6b'),
-                        fillcolor='rgba(0,166,237,0.2)' if ventricle == 'Left Ventricle' else 'rgba(255,107,107,0.2)'
+                        line=dict(color=_structure_color(ventricle)),
+                        fillcolor=_structure_color(ventricle, 0.2)
                     ))
                 
                 fig_radar.update_layout(
                     polar=dict(
                         radialaxis=dict(
                             visible=True,
-                            range=[0, max([max(vals) for vals in [values for values in metrics_by_class.values()]]) * 1.2]
+                            range=[0, radar_max * 1.2 if radar_max > 0 else 1]
                         )
                     ),
                     title='Comparative Cardiac Metrics',
@@ -643,7 +708,7 @@ def create_enhanced_metrics_dashboard(stats, masks):
                     if values:
                         fig_dist.add_trace(
                             go.Histogram(x=values, name=ventricle, opacity=0.7, 
-                                       marker_color='#00a6ed' if ventricle == 'Left Ventricle' else '#ff6b6b'),
+                                       marker_color=_structure_color(ventricle)),
                             row=row, col=col
                         )
             
@@ -844,9 +909,13 @@ def create_enhanced_3d_visualization(masks, stats):
             st.warning("No masks available for 3D visualization")
             return None
             
+        # Label each mask by the structure it belongs to (masks and stats are in the same order)
+        names = [stats[i]['Class'] if stats and i < len(stats) else f'Structure {i+1}' for i in range(len(masks))]
+        masks = [np.asarray(m).squeeze()[::2, ::2] for m in masks]  # downsample for faster 3D rendering
+
         tabs = st.tabs([
             "🎨 3D Surface",
-            "🏥 Volume Rendering",
+            "🏥 Combined Map",
             "📊 Contour Analysis",
             "🔄 Dynamic View"
         ])
@@ -854,9 +923,10 @@ def create_enhanced_3d_visualization(masks, stats):
         with tabs[0]:
             st.markdown("#### 3D Surface Visualization")
             
-            fig = make_subplots(rows=1, cols=min(3, len(masks)),
-                               subplot_titles=[f"{CLASS_NAMES.get(i, f'Mask {i+1}')} Surface" 
-                                              for i in range(min(3, len(masks)))])
+            n = min(3, len(masks))
+            fig = make_subplots(rows=1, cols=n,
+                               specs=[[{'type': 'surface'}] * n],
+                               subplot_titles=[f"{names[i]} Surface" for i in range(n)])
             
             for idx, mask in enumerate(masks[:3]):
                 z_data = mask.squeeze()
@@ -880,23 +950,21 @@ def create_enhanced_3d_visualization(masks, stats):
             st.plotly_chart(fig, use_container_width=True)
         
         with tabs[1]:
-            st.markdown("#### Volume Rendering")
+            st.markdown("#### Combined Structure Map")
+            st.caption("This is a single 2D slice; a true volume rendering needs a stack of slices.")
             
             if len(masks) > 0:
-                combined = np.zeros_like(masks[0].squeeze())
+                combined = np.zeros_like(masks[0], dtype=float)
                 for idx, mask in enumerate(masks):
-                    combined += (idx + 1) * mask.squeeze()
+                    combined[mask > 0] = idx + 1
                 
-                fig = go.Figure(data=go.Volume(
-                    x=np.arange(combined.shape[0]),
-                    y=np.arange(combined.shape[1]),
-                    z=np.arange(1),
-                    value=combined,
-                    opacity=0.5,
-                    surface_count=20,
-                    colorscale='Viridis'
+                fig = go.Figure(data=go.Heatmap(
+                    z=combined,
+                    colorscale='Viridis',
+                    colorbar=dict(tickvals=list(range(len(masks) + 1)),
+                                  ticktext=['Background'] + names)
                 ))
-                
+                fig.update_yaxes(autorange='reversed', scaleanchor='x')
                 fig.update_layout(height=600)
                 st.plotly_chart(fig, use_container_width=True)
         
@@ -904,8 +972,7 @@ def create_enhanced_3d_visualization(masks, stats):
             st.markdown("#### Contour Analysis")
             
             fig = make_subplots(rows=1, cols=len(masks),
-                               subplot_titles=[f"{CLASS_NAMES.get(i, f'Mask {i+1}')} Contours" 
-                                              for i in range(len(masks))])
+                               subplot_titles=[f"{names[i]} Contours" for i in range(len(masks))])
             
             for idx, mask in enumerate(masks):
                 z_data = mask.squeeze()
@@ -940,7 +1007,7 @@ def create_enhanced_3d_visualization(masks, stats):
                     y=y,
                     colorscale='Viridis',
                     opacity=0.7,
-                    name=CLASS_NAMES.get(idx, f'Structure {idx+1}')
+                    name=names[idx]
                 ))
             
             fig.update_layout(
@@ -1333,9 +1400,9 @@ def main():
         st.markdown("---")
         st.markdown("""
             ### 📋 Information
-            - **Model:** YOLOv8x-seg
-            - **Task:** Cardiac Structure Segmentation
-            - **Structures:** Left & Right Ventricles
+            - **Model:** YOLOv5s trained on cardiac MRI (`heart_1st/weights/best.pt`)
+            - **Task:** Detection + intensity-based outlining
+            - **Structures:** Left Ventricle, Myocardium, Right Ventricle
             - **Version:** 3.0 (Enhanced)
         """)
     
