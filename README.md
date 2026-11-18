@@ -4,6 +4,12 @@ A cardiac MRI segmentation project with two parts. The first is a detection mode
 
 > **Built on YOLOv5 by Ultralytics.** The detection framework in this repository (`models/`, `utils/`, `train.py`, `val.py`, `detect.py`, `export.py`, `benchmarks.py`, `hubconf.py`) is [YOLOv5](https://github.com/ultralytics/yolov5) by Ultralytics, used under the AGPL-3.0 licence. The original Ultralytics documentation is at [docs.ultralytics.com](https://docs.ultralytics.com/yolov5/). My own work in this repository is the heart dataset configuration, the trained model and its results (`heart_1st/`), and the Streamlit app (`heartsegapp.py`).
 
+## Block diagram
+
+![Block diagram: training of the YOLOv5s heart detector and the inference pipeline of the Streamlit app, from input slice to 3D views, metrics and report](docs/figures/pipeline_block_diagram.png)
+
+**Fig. 1.** Overview of the training and inference pipeline. *Training:* (a) annotated short-axis cardiac MRI slices (Roboflow heart-segmentation-2; LV, myocardium, RV); (b) COCO-pretrained YOLOv5s fine-tuned for 20 epochs at 416 × 416; (c) validation mAP per epoch from `heart_1st/results.csv`; (d) the trained weights. *Inference (`heartsegapp.py`):* (e) input slice; (f) contrast-enhanced variants (CLAHE, histogram equalisation, unsharp masking); (g) YOLOv5 detection, keeping the most confident box per structure; (h) structure outlines derived inside each box (Otsu blood pool for LV and RV, elliptical ring minus the LV cavity for the myocardium); (i) 3D surface rendering of the masks; (j) per-structure area and detection confidence; (k) report with the LV/RV area ratio. Panels (e)–(k) are actual outputs of the trained model and the app's pipeline on one slice from the dataset.
+
 ## Dataset
 
 | Item | Detail |
@@ -41,12 +47,10 @@ These are validation metrics at the final epoch (epoch 20), from `heart_1st/resu
 
 ## Streamlit app (`heartsegapp.py`)
 
-- **Segmentation:** YOLO segmentation with image-enhancement retries, falling back to classical segmentation if the model finds nothing
+- **Segmentation:** the trained heart detector (`heart_1st/weights/best.pt`) finds the left ventricle, myocardium and right ventricle; each structure is then outlined from image intensity inside its box. Image-enhancement retries are used, with classical multi-Otsu segmentation as a fallback if nothing is detected
 - **Dashboard:** comparative metrics, distribution plots, a correlation matrix and temporal trends
-- **3D visualisation:** surface, volume rendering, contour and dynamic views of the segmented structures
+- **3D visualisation:** surface, combined map, contour and dynamic views of the segmented structures
 - **Report:** a generated summary of the measurements
-
-The app currently downloads the general-purpose `yolov8x-seg.pt` weights at start-up. Connecting it to the heart-trained weights in `heart_1st/weights/` is the next step.
 
 ```bash
 pip install -r requirements.txt
